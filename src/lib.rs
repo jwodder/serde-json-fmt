@@ -207,6 +207,18 @@ impl Formatter for JSONFormatterOwned {
         writer.write_all(b"}")
     }
 
+    fn write_string_fragment<W: ?Sized + Write>(&mut self, writer: &mut W, fragment: &str) -> io::Result<()> {
+        for ch in fragment.chars() {
+            if !self.ascii || ch.is_ascii() {
+                writer.write_all(ch.encode_utf8(&mut [0; 4]).as_bytes())?;
+            } else {
+                for surrogate in ch.encode_utf16(&mut [0; 2]) {
+                    write!(writer, "\\u{surrogate:04x}")?;
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
