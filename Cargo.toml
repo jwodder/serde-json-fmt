@@ -8,5 +8,6 @@ license = "MIT"
 exclude = ["/.*"]
 
 [dependencies]
+serde = { version = "1.0.160", default-features = false }
 serde_json = "1.0.96"
 smartstring = "1.0.1"
