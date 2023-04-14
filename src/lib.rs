@@ -113,6 +113,107 @@ impl Default for JSONFormat {
     }
 }
 
+trait FormatterBehavior {
+    fn indent_level(&self) -> usize;
+    fn increase_indent(&mut self);
+    fn decrease_indent(&mut self);
+    fn indent_next(&self) -> bool;
+    fn set_indent_next(&mut self, flag: bool);
+    fn indent(&self) -> Option<&[u8]>;
+    fn comma(&self) -> &[u8];
+    fn colon(&self) -> &[u8];
+    fn ascii(&self) -> bool;
+
+    fn print_indent<W: ?Sized + Write>(&self, writer: &mut W) -> io::Result<()> {
+        if let Some(indent) = self.indent() {
+            writer.write_all(b"\n")?;
+            for _ in 0..self.indent_level() {
+                writer.write_all(indent)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl<F: FormatterBehavior> Formatter for F {
+    fn begin_array<W: ?Sized + Write>(&mut self, writer: &mut W) -> io::Result<()>
+    {
+        self.increase_indent();
+        self.set_indent_next(false);
+        writer.write_all(b"[")
+    }
+
+    fn begin_array_value<W: ?Sized + Write>(&mut self, writer: &mut W, first: bool) -> io::Result<()>
+    {
+        if !first {
+            writer.write_all(self.comma())?;
+        }
+        self.print_indent(writer)?
+    }
+
+    fn end_array_value<W: ?Sized + Write>(&mut self, _writer: &mut W) -> io::Result<()>
+    {
+        self.set_indent_next(true);
+        Ok(())
+    }
+
+    fn end_array<W: ?Sized + Write>(&mut self, writer: &mut W) -> io::Result<()>
+    {
+        self.decrease_indent();
+        if self.indent_next() {
+            self.print_indent(writer)?;
+        }
+        writer.write_all(b"]")
+    }
+
+    fn begin_object<W: ?Sized + Write>(&mut self, writer: &mut W) -> io::Result<()> {
+        self.increase_indent();
+        self.set_indent_next(false);
+        writer.write_all(b"{")
+    }
+
+    fn begin_object_key<W: ?Sized + Write>(&mut self, writer: &mut W, first: bool) -> io::Result<()>
+    {
+        if !first {
+            writer.write_all(self.comma)?;
+        }
+        self.print_indent(writer)?
+    }
+
+    fn begin_object_value<W: ?Sized + io::Write>(&mut self, writer: &mut W) -> io::Result<()>
+    {
+        writer.write_all(self.colon)
+    }
+
+    fn end_object_value<W: ?Sized + Write>(&mut self, _writer: &mut W) -> io::Result<()>
+    {
+        self.set_indent_next(true);
+        Ok(())
+    }
+
+    fn end_object<W: ?Sized + Write>(&mut self, writer: &mut W) -> io::Result<()>
+    {
+        self.decrease_indent();
+        if self.indent_next() {
+            self.print_indent(writer)?;
+        }
+        writer.write_all(b"}")
+    }
+
+    fn write_string_fragment<W: ?Sized + Write>(&mut self, writer: &mut W, fragment: &str) -> io::Result<()> {
+        for ch in fragment.chars() {
+            if !self.ascii() || ch.is_ascii() {
+                writer.write_all(ch.encode_utf8(&mut [0; 4]).as_bytes())?;
+            } else {
+                for surrogate in ch.encode_utf16(&mut [0; 2]) {
+                    write!(writer, "\\u{surrogate:04x}")?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct JSONFormatterOwned {
     indent_level: usize,
@@ -129,96 +230,28 @@ impl JSONFormatterOwned {
             indent_level: 0, indent_next: false, indent, comma, colon, ascii
         }
     }
-
-    fn print_indent<W: ?Sized + Write>(&self, writer: &mut W) -> io::Result<()> {
-        if self.indent.is_some() {
-            writer.write_all(b"\n")?;
-            for _ in 0..self.indent_level {
-                writer.write_all(self.indent.as_bytes())?;
-            }
-        }
-        Ok(())
-    }
 }
 
-impl Formatter for JSONFormatterOwned {
+impl FormatterBehavior for JSONFormatterOwned {
+    fn indent_level(&self) -> usize { self.indent_level }
 
-    fn begin_array<W: ?Sized + Write>(&mut self, writer: &mut W) -> io::Result<()>
-    {
-        self.current_indent += 1;
-        self.indent_next = false;
-        writer.write_all(b"[")
+    fn increase_indent(&mut self) { self.indent_level += 1; }
+
+    fn decrease_indent(&mut self) { self.decrease_indent -= 1; }
+
+    fn indent_next(&self) -> bool { self.indent_next }
+
+    fn set_indent_next(&mut self, flag: bool) {self.indent_next = flag; }
+
+    fn indent(&self) -> Option<&[u8]> {
+        self.indent.as_ref().map(|s| s.as_bytes())
     }
 
-    fn begin_array_value<W: ?Sized + Write>(&mut self, writer: &mut W, first: bool) -> io::Result<()>
-    {
-        if !first {
-            writer.write_all(self.comma.as_bytes())?;
-        }
-        self.print_indent(writer)?
-    }
+    fn comma(&self) -> &[u8] { self.comma.as_bytes() }
 
-    fn end_array_value<W: ?Sized + Write>(&mut self, _writer: &mut W) -> io::Result<()>
-    {
-        self.indent_next = true;
-        Ok(())
-    }
+    fn colon(&self) -> &[u8] { self.colon.as_bytes() }
 
-    fn end_array<W: ?Sized + Write>(&mut self, writer: &mut W) -> io::Result<()>
-    {
-        self.current_indent -= 1;
-        if self.indent_next {
-            self.print_indent(writer)?;
-        }
-        writer.write_all(b"]")
-    }
-
-    fn begin_object<W: ?Sized + Write>(&mut self, writer: &mut W) -> io::Result<()> {
-        self.current_indent += 1;
-        self.indent_next = false;
-        writer.write_all(b"{")
-    }
-
-    fn begin_object_key<W: ?Sized + Write>(&mut self, writer: &mut W, first: bool) -> io::Result<()>
-    {
-        if !first {
-            writer.write_all(self.comma.as_bytes())?;
-        }
-        self.print_indent(writer)?
-    }
-
-    fn begin_object_value<W: ?Sized + io::Write>(&mut self, writer: &mut W) -> io::Result<()>
-    {
-        writer.write_all(self.colon.as_bytes())
-    }
-
-    fn end_object_value<W: ?Sized + Write>(&mut self, _writer: &mut W) -> io::Result<()>
-    {
-        self.indent_next = true;
-        Ok(())
-    }
-
-    fn end_object<W: ?Sized + Write>(&mut self, writer: &mut W) -> io::Result<()>
-    {
-        self.current_indent -= 1;
-        if self.indent_next {
-            self.print_indent(writer)?;
-        }
-        writer.write_all(b"}")
-    }
-
-    fn write_string_fragment<W: ?Sized + Write>(&mut self, writer: &mut W, fragment: &str) -> io::Result<()> {
-        for ch in fragment.chars() {
-            if !self.ascii || ch.is_ascii() {
-                writer.write_all(ch.encode_utf8(&mut [0; 4]).as_bytes())?;
-            } else {
-                for surrogate in ch.encode_utf16(&mut [0; 2]) {
-                    write!(writer, "\\u{surrogate:04x}")?;
-                }
-            }
-        }
-        Ok(())
-    }
+    fn ascii(&self) -> bool { self.ascii }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -239,8 +272,24 @@ impl<'a> JSONFormatter<'a> {
     }
 }
 
-impl<'a> Formatter for JSONFormatter<'a> {
-    todo!()
+impl FormatterBehavior for JSONFormatterOwned {
+    fn indent_level(&self) -> usize { self.indent_level }
+
+    fn increase_indent(&mut self) { self.indent_level += 1; }
+
+    fn decrease_indent(&mut self) { self.decrease_indent -= 1; }
+
+    fn indent_next(&self) -> bool { self.indent_next }
+
+    fn set_indent_next(&mut self, flag: bool) {self.indent_next = flag; }
+
+    fn indent(&self) -> Option<&[u8]> { self.indent }
+
+    fn comma(&self) -> &[u8] { self.comma }
+
+    fn colon(&self) -> &[u8] { self.colon }
+
+    fn ascii(&self) -> bool { self.ascii }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
