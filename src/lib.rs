@@ -79,21 +79,16 @@ impl JSONFormat {
     }
 
     pub fn build(self) -> JSONFormatterOwned {
-        JSONFormatterOwned {
-            indent: self.indent,
-            comma: self.comma,
-            colon: self.colon,
-            ascii: self.ascii,
-        }
+        JSONFormatterOwned::new(self.indent, self.comma, self.colon, self.ascii)
     }
 
     pub fn as_formatter(&self) -> JSONFormatter<'_> {
-        JSONFormatter {
-            indent: self.indent.as_ref().map(|s| s.as_bytes()),
-            comma: self.comma.as_bytes(),
-            colon: self.colon.as_bytes(),
-            ascii: self.ascii,
-        }
+        JSONFormatter::new(
+            self.indent.as_ref().map(|s| s.as_bytes()),
+            self.comma.as_bytes(),
+            self.colon.as_bytes(),
+            self.ascii,
+        )
     }
 
     pub fn format_to_string<T: ?Sized + Serialize>(&self, value: &T) -> Result<String, serde_json::Error> {
@@ -120,16 +115,116 @@ impl Default for JSONFormat {
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct JSONFormatterOwned {
-    todo!()
+    indent_level: usize,
+    indent_next: bool,
+    indent: Option<smartstring>,
+    comma: smartstring,
+    colon: smartstring,
+    ascii: bool,
+}
+
+impl JSONFormatterOwned {
+    fn new(indent: Option<smartstring>, comma: smartstring, colon: smartstring, ascii: bool) -> Self {
+        JSONFormatterOwned {
+            indent_level: 0, indent_next: false, indent, comma, colon, ascii
+        }
+    }
+
+    fn print_indent<W: ?Sized + Write>(&self, writer: &mut W) -> io::Result<()> {
+        if self.indent.is_some() {
+            writer.write_all(b"\n")?;
+            for _ in 0..self.indent_level {
+                writer.write_all(self.indent.as_bytes())?;
+            }
+        }
+        Ok(())
+    }
 }
 
 impl Formatter for JSONFormatterOwned {
-    todo!()
+
+    fn begin_array<W: ?Sized + Write>(&mut self, writer: &mut W) -> io::Result<()>
+    {
+        self.current_indent += 1;
+        self.indent_next = false;
+        writer.write_all(b"[")
+    }
+
+    fn begin_array_value<W: ?Sized + Write>(&mut self, writer: &mut W, first: bool) -> io::Result<()>
+    {
+        if !first {
+            writer.write_all(self.comma.as_bytes())?;
+        }
+        self.print_indent(writer)?
+    }
+
+    fn end_array_value<W: ?Sized + Write>(&mut self, _writer: &mut W) -> io::Result<()>
+    {
+        self.indent_next = true;
+        Ok(())
+    }
+
+    fn end_array<W: ?Sized + Write>(&mut self, writer: &mut W) -> io::Result<()>
+    {
+        self.current_indent -= 1;
+        if self.indent_next {
+            self.print_indent(writer)?;
+        }
+        writer.write_all(b"]")
+    }
+
+    fn begin_object<W: ?Sized + Write>(&mut self, writer: &mut W) -> io::Result<()> {
+        self.current_indent += 1;
+        self.indent_next = false;
+        writer.write_all(b"{")
+    }
+
+    fn begin_object_key<W: ?Sized + Write>(&mut self, writer: &mut W, first: bool) -> io::Result<()>
+    {
+        if !first {
+            writer.write_all(self.comma.as_bytes())?;
+        }
+        self.print_indent(writer)?
+    }
+
+    fn begin_object_value<W: ?Sized + io::Write>(&mut self, writer: &mut W) -> io::Result<()>
+    {
+        writer.write_all(self.colon.as_bytes())
+    }
+
+    fn end_object_value<W: ?Sized + Write>(&mut self, _writer: &mut W) -> io::Result<()>
+    {
+        self.indent_next = true;
+        Ok(())
+    }
+
+    fn end_object<W: ?Sized + Write>(&mut self, writer: &mut W) -> io::Result<()>
+    {
+        self.current_indent -= 1;
+        if self.indent_next {
+            self.print_indent(writer)?;
+        }
+        writer.write_all(b"}")
+    }
+
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct JSONFormatter<'a> {
-    todo!()
+    indent_level: usize,
+    indent_next: bool,
+    indent: Option<&'a [u8]>,
+    comma: &'a [u8],
+    colon: &'a [u8],
+    ascii: bool,
+}
+
+impl<'a> JSONFormatter<'a> {
+    fn new(indent: Option<&'a [u8]>, comma: &'a [u8], colon: &'a [u8], ascii: bool) -> Self {
+        JSONFormatter {
+            indent_level: 0, indent_next: false, indent, comma, colon, ascii
+        }
+    }
 }
 
 impl<'a> Formatter for JSONFormatter<'a> {
