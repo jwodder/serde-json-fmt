@@ -5,7 +5,6 @@ use serde_json::ser::Formatter;
 use std::fmt;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-// TODO: Rename to something with "Builder" in its name?
 pub struct JSONFormat {
     indent: Option<smartstring>,
     comma: smartstring,
@@ -44,14 +43,16 @@ impl JSONFormat {
     // Errors when given an invalid separator (i.e., one that is not of the
     // form `/\A\s*,\s*\Z/`)
     pub fn comma<S: AsRef<str>>(mut self, s: S) -> Result<Self, Error> {
-        todo!()
+        self.comma = validate_string(s, Some(','))?;
+        Ok(self)
     }
 
     // Set the colon/key-value separator
     // Errors when given an invalid separator (i.e., one that is not of the
     // form `/\A\s*:\s*\Z/`)
     pub fn colon<S: AsRef<str>>(mut self, s: S) -> Result<Self, Error> {
-        todo!()
+        self.colon = validate_string(s, Some(':'))?;
+        Ok(self)
     }
 
     pub fn spaced_separators(self, flag: bool) -> Self {
@@ -69,7 +70,8 @@ impl JSONFormat {
     //    users should be advised to use `indent_width()` in this case instead
     //  - Errors if the string is not all JSON whitespace
     pub fn indent<S: AsRef<str>>(mut self, s: Option<S>) -> Result<Self, Error> {
-        todo!()
+        self.indent = s.map(|s| validate_string(s, None)).transpose()?;
+        Ok(self)
     }
 
     pub fn indent_width(self, n: Option<usize>) -> Self {
@@ -118,20 +120,20 @@ impl Default for JSONFormat {
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct JSONFormatterOwned {
-    ???
+    todo!()
 }
 
 impl Formatter for JSONFormatterOwned {
-    ???
+    todo!()
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct JSONFormatter<'a> {
-    ???
+    todo!()
 }
 
 impl<'a> Formatter for JSONFormatter<'a> {
-    ???
+    todo!()
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -147,8 +149,33 @@ pub enum Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        todo!()
+        match self {
+            InvalidCharacter(c) => write!(f, "String contains unexpected character {c:?}"),
+            MissingSeparator(c) => write!(f, "No occurrence of {c:?} found in string"),
+            MultipleSeparators(c) => write!(f, "Multiple occurrences of {c:?} found in string"),
+        }
     }
 }
 
 impl std::error::Error for Error {}
+
+fn validate_string<S: AsRef<str>>(s: S, sep: Option<char>) -> Result<smartstring, Error> {
+    let s = s.as_ref();
+    let mut seen_sep = false;
+    for ch in s.chars() {
+        match (sep, ch) {
+            (Some(sep_), ch) if sep_ == ch => {
+                if std::mem::replace(&mut seen_sep, true) {
+                    return Err(Error::MultipleSeparators(sep_));
+                }
+            }
+            // RFC 8259, section 2
+            (_, ' ' | '\t' | '\n' | '\r') => (),
+            (_, ch) => return Err(Error::InvalidCharacter(ch)),
+        }
+    }
+    if let Some(sep_) = sep && !seen_sep {
+        return Err(Error::MissingSeparator(sep_));
+    }
+    Ok(s.into())
+}
