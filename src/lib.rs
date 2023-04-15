@@ -690,6 +690,22 @@ mod tests {
     }
 
     #[test]
+    fn test_format_default_is_new() {
+        let value = json!({
+            "colors": ["red", "blue", "taupe"],
+            "sub": {
+                "name": "Foo",
+                "on": true,
+                "size": 17
+            }
+        });
+        assert_eq!(
+            JsonOptions::new().format_to_string(&value).unwrap(),
+            JsonOptions::default().format_to_string(&value).unwrap(),
+        );
+    }
+
+    #[test]
     fn test_format_default_matches_serde_json() {
         let value = json!({
             "colors": ["red", "blue", "taupe"],
@@ -1146,5 +1162,23 @@ mod tests {
         let value = json!(null);
         let s = JsonOptions::pretty().format_to_string(&value).unwrap();
         assert_eq!(s, "null");
+    }
+
+    #[test]
+    fn test_display_invalid_character() {
+        let e = Error::InvalidCharacter('ö');
+        assert_eq!(e.to_string(), "String contains unexpected character 'ö'");
+    }
+
+    #[test]
+    fn test_display_missing_separator() {
+        let e = Error::MissingSeparator('?');
+        assert_eq!(e.to_string(), "No occurrence of '?' found in string");
+    }
+
+    #[test]
+    fn test_display_multiple_separators() {
+        let e = Error::MultipleSeparators('?');
+        assert_eq!(e.to_string(), "Multiple occurrences of '?' found in string");
     }
 }
