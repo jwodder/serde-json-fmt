@@ -17,7 +17,7 @@
 //!
 //! ```
 //! use serde_json::json;
-//! use serde_json_fmt::JsonOptions;
+//! use serde_json_fmt::JsonFormat;
 //!
 //! let value = json!({
 //!     "colors": ["red", "blue", "taupe"],
@@ -28,7 +28,7 @@
 //!     }
 //! });
 //!
-//! let s = JsonOptions::new()
+//! let s = JsonFormat::new()
 //!     .comma(", ")
 //!     .unwrap()
 //!     .colon(": ")
@@ -48,7 +48,7 @@
 //!
 //! ```
 //! use serde_json::json;
-//! use serde_json_fmt::JsonOptions;
+//! use serde_json_fmt::JsonFormat;
 //!
 //! let value = json!({
 //!     "emojis": {
@@ -63,7 +63,7 @@
 //!     }
 //! });
 //!
-//! let s = JsonOptions::pretty()
+//! let s = JsonFormat::pretty()
 //!     .indent_width(Some(4))
 //!     .ascii(true)
 //!     .format_to_string(&value)
@@ -95,25 +95,25 @@ use std::io::{self, Write};
 ///
 /// This type is the "entry point" to `serde-json-fmt`'s functionality.  To
 /// perform custom-formatted JSON serialization, start by creating a
-/// `JsonOptions` instance by calling either [`JsonOptions::new()`] or
-/// [`JsonOptions::pretty()`], then call the various configuration methods as
+/// `JsonFormat` instance by calling either [`JsonFormat::new()`] or
+/// [`JsonFormat::pretty()`], then call the various configuration methods as
 /// desired, then either pass your [`serde::Serialize`] value to one of the
-/// [`format_to_string()`][JsonOptions::format_to_string],
-/// [`format_to_vec()`][JsonOptions::format_to_vec], and
-/// [`format_to_writer()`][JsonOptions::format_to_writer] convenience methods
-/// or else (for lower-level usage) call [`build()`][JsonOptions::build] or
-/// [`as_formatter()`][JsonOptions::as_formatter] to acquire a
+/// [`format_to_string()`][JsonFormat::format_to_string],
+/// [`format_to_vec()`][JsonFormat::format_to_vec], and
+/// [`format_to_writer()`][JsonFormat::format_to_writer] convenience methods or
+/// else (for lower-level usage) call [`build()`][JsonFormat::build] or
+/// [`as_formatter()`][JsonFormat::as_formatter] to acquire a
 /// [`serde_json::ser::Formatter`] instance.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct JsonOptions {
+pub struct JsonFormat {
     indent: Option<CompactString>,
     comma: CompactString,
     colon: CompactString,
     ascii: bool,
 }
 
-impl JsonOptions {
-    /// Create a new `JsonOptions` instance that starts out configured to use
+impl JsonFormat {
+    /// Create a new `JsonFormat` instance that starts out configured to use
     /// `serde_json`'s "compact" format.  Specifically, the instance is
     /// configured as follows:
     ///
@@ -122,7 +122,7 @@ impl JsonOptions {
     /// - `colon(":")`
     /// - `ascii(false)`
     pub fn new() -> Self {
-        JsonOptions {
+        JsonFormat {
             indent: None,
             comma: ",".into(),
             colon: ":".into(),
@@ -130,7 +130,7 @@ impl JsonOptions {
         }
     }
 
-    /// Create a new `JsonOptions` instance that starts out configured to use
+    /// Create a new `JsonFormat` instance that starts out configured to use
     /// `serde_json`'s "pretty" format.  Specifically, the instance is
     /// configured as follows:
     ///
@@ -139,7 +139,7 @@ impl JsonOptions {
     /// - `colon(": ")`
     /// - `ascii(false)`
     pub fn pretty() -> Self {
-        JsonOptions {
+        JsonFormat {
             indent: Some("  ".into()),
             comma: ",".into(),
             colon: ": ".into(),
@@ -204,9 +204,9 @@ impl JsonOptions {
     /// Set the string used for indentation to the given number of spaces.
     ///
     /// This method is a convenience wrapper around
-    /// [`indent()`][JsonOptions::indent] that calls it with a string
-    /// consisting of the given number of space characters, or with `None` if
-    /// `n` is `None`.
+    /// [`indent()`][JsonFormat::indent] that calls it with a string consisting
+    /// of the given number of space characters, or with `None` if `n` is
+    /// `None`.
     pub fn indent_width(self, n: Option<usize>) -> Self {
         self.indent(n.map(|i| CompactString::from(" ").repeat(i)))
             .unwrap()
@@ -256,31 +256,31 @@ impl JsonOptions {
         value.serialize(&mut ser)
     }
 
-    /// Consume the `JsonOptions` instance and return a
+    /// Consume the `JsonFormat` instance and return a
     /// [`serde_json::ser::Formatter`] instance.
     ///
     /// This is a low-level operation.  For most use cases, using one of the
-    /// [`format_to_string()`][JsonOptions::format_to_string],
-    /// [`format_to_vec()`][JsonOptions::format_to_vec], and
-    /// [`format_to_writer()`][JsonOptions::format_to_writer] convenience
+    /// [`format_to_string()`][JsonFormat::format_to_string],
+    /// [`format_to_vec()`][JsonFormat::format_to_vec], and
+    /// [`format_to_writer()`][JsonFormat::format_to_writer] convenience
     /// methods is recommended.
-    pub fn build(self) -> JsonFormatterOwned {
-        JsonFormatterOwned::new(self)
+    pub fn build(self) -> JsonFormatter {
+        JsonFormatter::new(self)
     }
 
     /// Return a [`serde_json::ser::Formatter`] instance that borrows data from
-    /// the `JsonOptions` instance.
+    /// the `JsonFormat` instance.
     ///
     /// This is a low-level operation.  For most use cases, using one of the
-    /// [`format_to_string()`][JsonOptions::format_to_string],
-    /// [`format_to_vec()`][JsonOptions::format_to_vec], and
-    /// [`format_to_writer()`][JsonOptions::format_to_writer] convenience
+    /// [`format_to_string()`][JsonFormat::format_to_string],
+    /// [`format_to_vec()`][JsonFormat::format_to_vec], and
+    /// [`format_to_writer()`][JsonFormat::format_to_writer] convenience
     /// methods is recommended.
     ///
-    /// Unlike [`build()`][JsonOptions::build], this method makes it possible
-    /// to create multiple `Formatter`s from a single `JsonOptions` instance.
-    pub fn as_formatter(&self) -> JsonFormatter<'_> {
-        JsonFormatter::new(internal::JsonOpts {
+    /// Unlike [`build()`][JsonFormat::build], this method makes it possible to
+    /// create multiple `Formatter`s from a single `JsonFormat` instance.
+    pub fn as_formatter(&self) -> JsonFrmtr<'_> {
+        JsonFrmtr::new(internal::JsonFmt {
             indent: self.indent.as_ref().map(|s| s.as_bytes()),
             comma: self.comma.as_bytes(),
             colon: self.colon.as_bytes(),
@@ -289,10 +289,10 @@ impl JsonOptions {
     }
 }
 
-impl Default for JsonOptions {
-    /// Equivalent to [`JsonOptions::new()`]
+impl Default for JsonFormat {
+    /// Equivalent to [`JsonFormat::new()`]
     fn default() -> Self {
-        JsonOptions::new()
+        JsonFormat::new()
     }
 }
 
@@ -308,7 +308,7 @@ mod internal {
         fn ascii(&self) -> bool;
     }
 
-    impl OptionsData for JsonOptions {
+    impl OptionsData for JsonFormat {
         fn indent(&self) -> Option<&[u8]> {
             self.indent.as_ref().map(|s| s.as_bytes())
         }
@@ -327,14 +327,14 @@ mod internal {
     }
 
     #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-    pub struct JsonOpts<'a> {
+    pub struct JsonFmt<'a> {
         pub indent: Option<&'a [u8]>,
         pub comma: &'a [u8],
         pub colon: &'a [u8],
         pub ascii: bool,
     }
 
-    impl<'a> OptionsData for JsonOpts<'a> {
+    impl<'a> OptionsData for JsonFmt<'a> {
         fn indent(&self) -> Option<&[u8]> {
             self.indent
         }
@@ -465,17 +465,17 @@ mod internal {
 
 /// A [`serde_json::ser::Formatter`] type that owns its data.
 ///
-/// Instances of this type are acquired by calling [`JsonOptions::build()`].
-pub type JsonFormatterOwned = internal::JsonFormatterBase<JsonOptions>;
+/// Instances of this type are acquired by calling [`JsonFormat::build()`].
+pub type JsonFormatter = internal::JsonFormatterBase<JsonFormat>;
 
 /// A [`serde_json::ser::Formatter`] type that borrows its data from a
-/// [`JsonOptions`].
+/// [`JsonFormat`].
 ///
 /// Instances of this type are acquired by calling
-/// [`JsonOptions::as_formatter()`].
-pub type JsonFormatter<'a> = internal::JsonFormatterBase<internal::JsonOpts<'a>>;
+/// [`JsonFormat::as_formatter()`].
+pub type JsonFrmtr<'a> = internal::JsonFormatterBase<internal::JsonFmt<'a>>;
 
-/// Error returned when an invalid string is passed to certain [`JsonOptions`]
+/// Error returned when an invalid string is passed to certain [`JsonFormat`]
 /// methods.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Error {
@@ -483,13 +483,13 @@ pub enum Error {
     /// character.  Contains the character in question.
     InvalidCharacter(char),
 
-    /// Retured when a string passed to [`JsonOptions::comma()`] or
-    /// [`JsonOptions::colon()`] does not contain a comma or colon,
+    /// Retured when a string passed to [`JsonFormat::comma()`] or
+    /// [`JsonFormat::colon()`] does not contain a comma or colon,
     /// respectively.  Contains a comma or colon as appropriate.
     MissingSeparator(char),
 
-    /// Retured when a string passed to [`JsonOptions::comma()`] or
-    /// [`JsonOptions::colon()`] contains more than one comma or colon,
+    /// Retured when a string passed to [`JsonFormat::comma()`] or
+    /// [`JsonFormat::colon()`] contains more than one comma or colon,
     /// respectively.  Contains a comma or colon as appropriate.
     MultipleSeparators(char),
 }
@@ -654,7 +654,7 @@ mod tests {
                 "size": 17
             }
         });
-        let s = JsonOptions::new().format_to_string(&value).unwrap();
+        let s = JsonFormat::new().format_to_string(&value).unwrap();
         assert_eq!(
             s,
             r#"{"colors":["red","blue","taupe"],"sub":{"name":"Foo","on":true,"size":17}}"#
@@ -671,7 +671,7 @@ mod tests {
                 "size": 17
             }
         });
-        let s = JsonOptions::pretty().format_to_string(&value).unwrap();
+        let s = JsonFormat::pretty().format_to_string(&value).unwrap();
         assert_eq!(
             s,
             indoc! {r#"{
@@ -700,8 +700,8 @@ mod tests {
             }
         });
         assert_eq!(
-            JsonOptions::new().format_to_string(&value).unwrap(),
-            JsonOptions::default().format_to_string(&value).unwrap(),
+            JsonFormat::new().format_to_string(&value).unwrap(),
+            JsonFormat::default().format_to_string(&value).unwrap(),
         );
     }
 
@@ -716,7 +716,7 @@ mod tests {
             }
         });
         assert_eq!(
-            JsonOptions::new().format_to_string(&value).unwrap(),
+            JsonFormat::new().format_to_string(&value).unwrap(),
             serde_json::to_string(&value).unwrap(),
         );
     }
@@ -732,7 +732,7 @@ mod tests {
             }
         });
         assert_eq!(
-            JsonOptions::pretty().format_to_string(&value).unwrap(),
+            JsonFormat::pretty().format_to_string(&value).unwrap(),
             serde_json::to_string_pretty(&value).unwrap(),
         );
     }
@@ -773,7 +773,7 @@ mod tests {
                 "on": true
             }
         });
-        let s = JsonOptions::pretty().format_to_string(&value).unwrap();
+        let s = JsonFormat::pretty().format_to_string(&value).unwrap();
         assert_eq!(
             s,
             indoc! {r#"{
@@ -849,7 +849,7 @@ mod tests {
                 "on": true
             }
         });
-        let s = JsonOptions::pretty()
+        let s = JsonFormat::pretty()
             .indent_width(Some(4))
             .format_to_string(&value)
             .unwrap();
@@ -907,7 +907,7 @@ mod tests {
                 ]
             }
         });
-        let s = JsonOptions::pretty()
+        let s = JsonFormat::pretty()
             .indent(Some(""))
             .unwrap()
             .format_to_string(&value)
@@ -945,7 +945,7 @@ mod tests {
                 ]
             }
         });
-        let s = JsonOptions::pretty()
+        let s = JsonFormat::pretty()
             .indent_width(Some(0))
             .format_to_string(&value)
             .unwrap();
@@ -982,7 +982,7 @@ mod tests {
                 ]
             }
         });
-        let s = JsonOptions::pretty()
+        let s = JsonFormat::pretty()
             .indent(Some("\t"))
             .unwrap()
             .format_to_string(&value)
@@ -1015,7 +1015,7 @@ mod tests {
                 "size": 17
             }
         });
-        let s = JsonOptions::new()
+        let s = JsonFormat::new()
             .comma(", ")
             .unwrap()
             .colon(": ")
@@ -1038,7 +1038,7 @@ mod tests {
                 "size": 17
             }
         });
-        let s = JsonOptions::new()
+        let s = JsonFormat::new()
             .comma("\n,")
             .unwrap()
             .colon("\t:\t")
@@ -1057,7 +1057,7 @@ mod tests {
             "föö": "snow☃man",
             "\u{1F410}": "\u{1F600}",
         });
-        let s = JsonOptions::new().format_to_string(&value).unwrap();
+        let s = JsonFormat::new().format_to_string(&value).unwrap();
         assert_eq!(s, "{\"föö\":\"snow☃man\",\"\u{1F410}\":\"\u{1F600}\"}");
     }
 
@@ -1067,7 +1067,7 @@ mod tests {
             "föö": "snow☃man",
             "\u{1F410}": "\u{1F600}",
         });
-        let s = JsonOptions::new()
+        let s = JsonFormat::new()
             .ascii(true)
             .format_to_string(&value)
             .unwrap();
@@ -1080,14 +1080,14 @@ mod tests {
     #[test]
     fn test_format_top_level_array() {
         let value = json!(["apple", ["banana"], {"grape": "raisin"}]);
-        let s = JsonOptions::new().format_to_string(&value).unwrap();
+        let s = JsonFormat::new().format_to_string(&value).unwrap();
         assert_eq!(s, r#"["apple",["banana"],{"grape":"raisin"}]"#);
     }
 
     #[test]
     fn test_format_top_level_array_pretty() {
         let value = json!(["apple", ["banana"], {"grape": "raisin"}]);
-        let s = JsonOptions::pretty().format_to_string(&value).unwrap();
+        let s = JsonFormat::pretty().format_to_string(&value).unwrap();
         assert_eq!(
             s,
             indoc! {r#"[
@@ -1104,63 +1104,63 @@ mod tests {
 
     #[test]
     fn test_format_top_level_int() {
-        let s = JsonOptions::new().format_to_string(&42).unwrap();
+        let s = JsonFormat::new().format_to_string(&42).unwrap();
         assert_eq!(s, "42");
     }
 
     #[test]
     fn test_format_top_level_int_pretty() {
-        let s = JsonOptions::pretty().format_to_string(&42).unwrap();
+        let s = JsonFormat::pretty().format_to_string(&42).unwrap();
         assert_eq!(s, "42");
     }
 
     #[test]
     fn test_format_top_level_float() {
-        let s = JsonOptions::new().format_to_string(&6.022).unwrap();
+        let s = JsonFormat::new().format_to_string(&6.022).unwrap();
         assert_eq!(s, "6.022");
     }
 
     #[test]
     fn test_format_top_level_float_pretty() {
-        let s = JsonOptions::pretty().format_to_string(&6.022).unwrap();
+        let s = JsonFormat::pretty().format_to_string(&6.022).unwrap();
         assert_eq!(s, "6.022");
     }
 
     #[test]
     fn test_format_top_level_string() {
-        let s = JsonOptions::new().format_to_string("foo").unwrap();
+        let s = JsonFormat::new().format_to_string("foo").unwrap();
         assert_eq!(s, r#""foo""#);
     }
 
     #[test]
     fn test_format_top_level_string_pretty() {
-        let s = JsonOptions::pretty().format_to_string("foo").unwrap();
+        let s = JsonFormat::pretty().format_to_string("foo").unwrap();
         assert_eq!(s, r#""foo""#);
     }
 
     #[test]
     fn test_format_top_level_bool() {
-        let s = JsonOptions::new().format_to_string(&true).unwrap();
+        let s = JsonFormat::new().format_to_string(&true).unwrap();
         assert_eq!(s, "true");
     }
 
     #[test]
     fn test_format_top_level_bool_pretty() {
-        let s = JsonOptions::pretty().format_to_string(&true).unwrap();
+        let s = JsonFormat::pretty().format_to_string(&true).unwrap();
         assert_eq!(s, "true");
     }
 
     #[test]
     fn test_format_top_level_null() {
         let value = json!(null);
-        let s = JsonOptions::new().format_to_string(&value).unwrap();
+        let s = JsonFormat::new().format_to_string(&value).unwrap();
         assert_eq!(s, "null");
     }
 
     #[test]
     fn test_format_top_level_null_pretty() {
         let value = json!(null);
-        let s = JsonOptions::pretty().format_to_string(&value).unwrap();
+        let s = JsonFormat::pretty().format_to_string(&value).unwrap();
         assert_eq!(s, "null");
     }
 

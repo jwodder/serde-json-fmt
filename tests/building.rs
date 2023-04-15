@@ -1,18 +1,18 @@
 use indoc::indoc;
 use serde::Serialize;
 use serde_json::{json, Serializer};
-use serde_json_fmt::JsonOptions;
+use serde_json_fmt::JsonFormat;
 
 #[test]
-fn test_json_formatter_owned_is_formatter() {
-    // Test that JsonFormatterOwned is usable as a Formatter implementation
-    // outside the crate despite the implementation involving private stuff.
+fn test_json_formatter_is_formatter() {
+    // Test that JsonFormatter is usable as a Formatter implementation outside
+    // the crate despite the implementation involving private stuff.
     let value = json!({
         "name": "foo",
         "on": false,
         "size": 42
     });
-    let formatter = JsonOptions::pretty().build();
+    let formatter = JsonFormat::pretty().build();
     let mut vec = Vec::with_capacity(128);
     let mut ser = Serializer::with_formatter(&mut vec, formatter);
     value.serialize(&mut ser).unwrap();
@@ -28,15 +28,15 @@ fn test_json_formatter_owned_is_formatter() {
 }
 
 #[test]
-fn test_json_format_is_formatter() {
-    // Test that JsonFormatter is usable as a Formatter implementation outside
-    // the crate despite the implementation involving private stuff.
+fn test_json_frmtr_is_formatter() {
+    // Test that JsonFrmtr is usable as a Formatter implementation outside the
+    // crate despite the implementation involving private stuff.
     let value = json!({
         "name": "foo",
         "on": false,
         "size": 42
     });
-    let builder = JsonOptions::pretty();
+    let builder = JsonFormat::pretty();
     let formatter = builder.as_formatter();
     let mut vec = Vec::with_capacity(128);
     let mut ser = Serializer::with_formatter(&mut vec, formatter);

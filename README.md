@@ -24,7 +24,7 @@ doesn't do.  `serde-json-fmt` lets you do that:
 
 ```rust
 use serde_json::json;
-use serde_json_fmt::JsonOptions;
+use serde_json_fmt::JsonFormat;
 
 let value = json!({
     "colors": ["red", "blue", "taupe"],
@@ -35,7 +35,7 @@ let value = json!({
     }
 });
 
-let s = JsonOptions::new()
+let s = JsonFormat::new()
     .comma(", ")
     .unwrap()
     .colon(": ")
@@ -55,7 +55,7 @@ indents and with all non-ASCII characters encoded as `\uXXXX` escape sequences.
 
 ```rust
 use serde_json::json;
-use serde_json_fmt::JsonOptions;
+use serde_json_fmt::JsonFormat;
 
 let value = json!({
     "emojis": {
@@ -70,7 +70,7 @@ let value = json!({
     }
 });
 
-let s = JsonOptions::pretty()
+let s = JsonFormat::pretty()
     .indent_width(Some(4))
     .ascii(true)
     .format_to_string(&value)
