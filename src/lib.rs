@@ -51,8 +51,16 @@
 //! use serde_json_fmt::JsonOptions;
 //!
 //! let value = json!({
-//!     "föö": "snow☃man",
-//!     "🐐": "😀",
+//!     "emojis": {
+//!         "goat":"🐐",
+//!         "pineapple": "🍍",
+//!         "smile": "😀",
+//!     },
+//!     "greek": {
+//!         "α": "alpha",
+//!         "β": "beta",
+//!         "γ": "gamma",
+//!     }
 //! });
 //!
 //! let s = JsonOptions::pretty()
@@ -61,15 +69,18 @@
 //!     .format_to_string(&value)
 //!     .unwrap();
 //!
-//! assert_eq!(
-//!     s,
-//!     concat!(
-//!         "{\n",
-//!         "    \"f\\u00f6\\u00f6\": \"snow\\u2603man\",\n",
-//!         "    \"\\ud83d\\udc10\": \"\\ud83d\\ude00\"\n",
-//!         "}",
-//!     )
-//! );
+//! assert_eq!(s, r#"{
+//!     "emojis": {
+//!         "goat": "\ud83d\udc10",
+//!         "pineapple": "\ud83c\udf4d",
+//!         "smile": "\ud83d\ude00"
+//!     },
+//!     "greek": {
+//!         "\u03b1": "alpha",
+//!         "\u03b2": "beta",
+//!         "\u03b3": "gamma"
+//!     }
+//! }"#);
 //! ```
 
 use serde::Serialize;
