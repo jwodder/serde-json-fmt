@@ -1,4 +1,4 @@
-//! Configurable formatting for serde-json serialization
+//! Configurable formatting for serde_json serialization
 //!
 //! The `serde-json-fmt` crate lets you create custom [`serde_json`] formatters
 //! with the indentation, separators, and ASCII requirements of your choice.
@@ -79,6 +79,20 @@ use smartstring::alias::CompactString;
 use std::fmt;
 use std::io::{self, Write};
 
+/// A [`Formatter`][serde_json::ser::Formatter] builder for configuring JSON
+/// serialization options.
+///
+/// This type is the "entry point" to `serde-json-fmt`'s functionality.  To
+/// perform custom-formatted JSON serialization, start by creating a
+/// `JsonOptions` instance by calling either [`JsonOptions::new()`] or
+/// [`JsonOptions::pretty()`], then call the various configuration methods as
+/// desired, then either pass your [`serde::Serialize`] value to one of the
+/// [`format_to_string()`][JsonOptions::format_to_string],
+/// [`format_to_vec()`][JsonOptions::format_to_vec], and
+/// [`format_to_writer()`][JsonOptions::format_to_writer] convenience methods
+/// or else (for lower-level usage) call [`build()`][JsonOptions::build] or
+/// [`as_formatter()`][JsonOptions::as_formatter] to acquire a
+/// [`serde_json::ser::Formatter`] instance.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct JsonOptions {
     indent: Option<CompactString>,
@@ -88,8 +102,14 @@ pub struct JsonOptions {
 }
 
 impl JsonOptions {
-    // Uses serde-json's default/"compact" formatting
-    // Note that this format omits spaces from the comma & colon separators
+    /// Create a new `JsonOptions` instance that starts out configured to use
+    /// `serde_json`'s "compact" format.  Specifically, the instance is
+    /// configured as follows:
+    ///
+    /// - `indent(None)`
+    /// - `comma(",")`
+    /// - `colon(":")`
+    /// - `ascii(false)`
     pub fn new() -> Self {
         JsonOptions {
             indent: None,
@@ -99,7 +119,14 @@ impl JsonOptions {
         }
     }
 
-    // Uses serde-json's "pretty" formatting
+    /// Create a new `JsonOptions` instance that starts out configured to use
+    /// `serde_json`'s "pretty" format.  Specifically, the instance is
+    /// configured as follows:
+    ///
+    /// - `indent(Some("  "))` (two spaces)
+    /// - `comma(",")`
+    /// - `colon(": ")`
+    /// - `ascii(false)`
     pub fn pretty() -> Self {
         JsonOptions {
             indent: Some("  ".into()),
@@ -109,56 +136,77 @@ impl JsonOptions {
         }
     }
 
+    /// Set whether non-ASCII characters in strings should be serialized as
+    /// ASCII using `\uXXXX` escape sequences.  If `flag` is `true`, then all
+    /// non-ASCII characters will be escaped; if `flag` is `false`, then
+    /// non-ASCII characters will be serialized as themselves.
     pub fn ascii(mut self, flag: bool) -> Self {
         self.ascii = flag;
         self
     }
 
-    // Set the comma/list item separator
-    // Errors when given an invalid separator (i.e., one that is not of the
-    // form `/\A\s*,\s*\Z/`)
+    /// Set the string to use as the item separator in lists & objects.
+    ///
+    /// `s` must contain exactly one comma (`,`) character; all other
+    /// characters must be space characters, tabs, line feeds, and/or carriage
+    /// returns.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if `s` does not meet the above requirements.
     pub fn comma<S: AsRef<str>>(mut self, s: S) -> Result<Self, Error> {
         self.comma = validate_string(s, Some(','))?;
         Ok(self)
     }
 
-    // Set the colon/key-value separator
-    // Errors when given an invalid separator (i.e., one that is not of the
-    // form `/\A\s*:\s*\Z/`)
+    /// Set the string to use as the key-value separator in objects.
+    ///
+    /// `s` must contain exactly one colon (`:`) character; all other
+    /// characters must be space characters, tabs, line feeds, and/or carriage
+    /// returns.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if `s` does not meet the above requirements.
     pub fn colon<S: AsRef<str>>(mut self, s: S) -> Result<Self, Error> {
         self.colon = validate_string(s, Some(':'))?;
         Ok(self)
     }
 
-    // Sets the indentation
-    //  - `None` means to not insert any newlines, while `Some("")` means to
-    //    insert newlines but not indent.
-    //  - Problem: passing `None` will require specifying the type of `S`;
-    //    users should be advised to use `indent_width()` in this case instead
-    //  - Errors if the string is not all JSON whitespace
+    /// Set the string used for indentation.
+    ///
+    /// If `s` is `None`, then no indentation or newlines will be inserted when
+    /// serializing.  If `s` is `Some("")` (an empty string), then newlines
+    /// will be inserted, but nothing will be indented.  If `s` contains any
+    /// other string, the string must consist entirely of space characters,
+    /// tabs, line feeds, and/or carriage returns.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if `s` contains a string that contains any character
+    /// other than those listed above.
     pub fn indent<S: AsRef<str>>(mut self, s: Option<S>) -> Result<Self, Error> {
         self.indent = s.map(|s| validate_string(s, None)).transpose()?;
         Ok(self)
     }
 
+    /// Set the string used for indentation to the given number of spaces.
+    ///
+    /// This method is a convenience wrapper around
+    /// [`indent()`][JsonOptions::indent] that calls it with a string
+    /// consisting of the given number of space characters, or with `None` if
+    /// `n` is `None`.
     pub fn indent_width(self, n: Option<usize>) -> Self {
         self.indent(n.map(|i| CompactString::from(" ").repeat(i)))
             .unwrap()
     }
 
-    pub fn build(self) -> JsonFormatterOwned {
-        JsonFormatterOwned::new(self)
-    }
-
-    pub fn as_formatter(&self) -> JsonFormatter<'_> {
-        JsonFormatter::new(internal::JsonOptionsRef {
-            indent: self.indent.as_ref().map(|s| s.as_bytes()),
-            comma: self.comma.as_bytes(),
-            colon: self.colon.as_bytes(),
-            ascii: self.ascii,
-        })
-    }
-
+    /// Format a [`serde::Serialize`] value to a [`String`] as JSON using the
+    /// configured formatting options.
+    ///
+    /// # Errors
+    ///
+    /// Has the same error conditions as [`serde_json::to_string()`].
     pub fn format_to_string<T: ?Sized + Serialize>(
         &self,
         value: &T,
@@ -167,6 +215,27 @@ impl JsonOptions {
             .map(|v| String::from_utf8(v).unwrap())
     }
 
+    /// Format a [`serde::Serialize`] value to a [`Vec<u8>`] as JSON using the
+    /// configured formatting options.
+    ///
+    /// # Errors
+    ///
+    /// Has the same error conditions as [`serde_json::to_vec()`].
+    pub fn format_to_vec<T: ?Sized + Serialize>(
+        &self,
+        value: &T,
+    ) -> Result<Vec<u8>, serde_json::Error> {
+        let mut vec = Vec::with_capacity(128);
+        self.format_to_writer(&mut vec, value)?;
+        Ok(vec)
+    }
+
+    /// Write a [`serde::Serialize`] value to a [`std::io::Write`] instance as
+    /// JSON using the configured formatting options.
+    ///
+    /// # Errors
+    ///
+    /// Has the same error conditions as [`serde_json::to_writer()`].
     pub fn format_to_writer<T: ?Sized + Serialize, W: Write>(
         &self,
         writer: W,
@@ -176,17 +245,41 @@ impl JsonOptions {
         value.serialize(&mut ser)
     }
 
-    pub fn format_to_vec<T: ?Sized + Serialize>(
-        &self,
-        value: &T,
-    ) -> Result<Vec<u8>, serde_json::Error> {
-        let mut vec = Vec::with_capacity(128);
-        self.format_to_writer(&mut vec, value)?;
-        Ok(vec)
+    /// Consume the `JsonOptions` instance and return a
+    /// [`serde_json::ser::Formatter`] instance.
+    ///
+    /// This is a low-level operation.  For most use cases, using one of the
+    /// [`format_to_string()`][JsonOptions::format_to_string],
+    /// [`format_to_vec()`][JsonOptions::format_to_vec], and
+    /// [`format_to_writer()`][JsonOptions::format_to_writer] convenience
+    /// methods is recommended.
+    pub fn build(self) -> JsonFormatterOwned {
+        JsonFormatterOwned::new(self)
+    }
+
+    /// Return a [`serde_json::ser::Formatter`] instance that borrows data from
+    /// the `JsonOptions` instance.
+    ///
+    /// This is a low-level operation.  For most use cases, using one of the
+    /// [`format_to_string()`][JsonOptions::format_to_string],
+    /// [`format_to_vec()`][JsonOptions::format_to_vec], and
+    /// [`format_to_writer()`][JsonOptions::format_to_writer] convenience
+    /// methods is recommended.
+    ///
+    /// Unlike [`build()`][JsonOptions::build], this method makes it possible
+    /// to create multiple `Formatter`s from a single `JsonOptions` instance.
+    pub fn as_formatter(&self) -> JsonFormatter<'_> {
+        JsonFormatter::new(internal::JsonOptionsRef {
+            indent: self.indent.as_ref().map(|s| s.as_bytes()),
+            comma: self.comma.as_bytes(),
+            colon: self.colon.as_bytes(),
+            ascii: self.ascii,
+        })
     }
 }
 
 impl Default for JsonOptions {
+    /// Equivalent to [`JsonOptions::new()`]
     fn default() -> Self {
         JsonOptions::new()
     }
@@ -359,16 +452,34 @@ mod internal {
     }
 }
 
+/// A [`serde_json::ser::Formatter`] type that owns its data.
+///
+/// Instances of this type are acquired by calling [`JsonOptions::build()`].
 pub type JsonFormatterOwned = internal::JsonFormatterBase<JsonOptions>;
+
+/// A [`serde_json::ser::Formatter`] type that borrows its data from a
+/// [`JsonOptions`].
+///
+/// Instances of this type are acquired by calling
+/// [`JsonOptions::as_formatter()`].
 pub type JsonFormatter<'a> = internal::JsonFormatterBase<internal::JsonOptionsRef<'a>>;
 
+/// Error returned when an invalid string is passed to certain [`JsonOptions`]
+/// methods.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Error {
-    // a string parameter contained an unexpected character
+    /// Returned when the given string contains an invalid/unexpected
+    /// character.  Contains the character in question.
     InvalidCharacter(char),
-    // a `comma` or `colon` parameter is missing the comma/colon
+
+    /// Retured when a string passed to [`JsonOptions::comma()`] or
+    /// [`JsonOptions::colon()`] does not contain a comma or colon,
+    /// respectively.  Contains a comma or colon as appropriate.
     MissingSeparator(char),
-    // a `comma` or `colon` parameter has multiple commas/colons
+
+    /// Retured when a string passed to [`JsonOptions::comma()`] or
+    /// [`JsonOptions::colon()`] contains more than one comma or colon,
+    /// respectively.  Contains a comma or colon as appropriate.
     MultipleSeparators(char),
 }
 
