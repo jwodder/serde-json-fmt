@@ -56,14 +56,6 @@ impl JsonOptions {
         Ok(self)
     }
 
-    pub fn spaced_separators(self, flag: bool) -> Self {
-        if flag {
-            self.comma(", ").unwrap().colon(": ").unwrap()
-        } else {
-            self.comma(",").unwrap().colon(":").unwrap()
-        }
-    }
-
     // Sets the indentation
     //  - `None` means to not insert any newlines, while `Some("")` means to
     //    insert newlines but not indent.
@@ -126,6 +118,8 @@ impl Default for JsonOptions {
     }
 }
 
+// Workaround from <https://github.com/rust-lang/rust/issues/34537> for making
+// types in public interfaces private
 mod internal {
     use super::*;
 
@@ -295,7 +289,6 @@ pub type JsonFormatterOwned = internal::JsonFormatterBase<JsonOptions>;
 pub type JsonFormatter<'a> = internal::JsonFormatterBase<internal::JsonOptionsRef<'a>>;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-// TODO: Rename to something like "ArgumentError"/"ParameterError"
 pub enum Error {
     // a string parameter contained an unexpected character
     InvalidCharacter(char),
@@ -344,8 +337,9 @@ fn validate_string<S: AsRef<str>>(s: S, sep: Option<char>) -> Result<CompactStri
 #[cfg(test)]
 mod tests {
     use super::*;
-    //use serde::Serialize;
+    use indoc::indoc;
     use rstest::rstest;
+    use serde_json::json;
 
     #[rstest]
     #[case("?", Ok("?".into()))]
@@ -452,5 +446,509 @@ mod tests {
     #[case(" ☃ ", Err(Error::InvalidCharacter('☃')))]
     fn test_validate_string_no_sep(#[case] s: &str, #[case] r: Result<CompactString, Error>) {
         assert_eq!(validate_string(s, None), r);
+    }
+
+    #[test]
+    fn test_format_default() {
+        let value = json!({
+            "colors": ["red", "blue", "taupe"],
+            "sub": {
+                "name": "Foo",
+                "on": true,
+                "size": 17
+            }
+        });
+        let s = JsonOptions::new().format_to_string(&value).unwrap();
+        assert_eq!(
+            s,
+            r#"{"colors":["red","blue","taupe"],"sub":{"name":"Foo","on":true,"size":17}}"#
+        );
+    }
+
+    #[test]
+    fn test_format_pretty() {
+        let value = json!({
+            "colors": ["red", "blue", "taupe"],
+            "sub": {
+                "name": "Foo",
+                "on": true,
+                "size": 17
+            }
+        });
+        let s = JsonOptions::pretty().format_to_string(&value).unwrap();
+        assert_eq!(
+            s,
+            indoc! {r#"{
+              "colors": [
+                "red",
+                "blue",
+                "taupe"
+              ],
+              "sub": {
+                "name": "Foo",
+                "on": true,
+                "size": 17
+              }
+            }"#}
+        );
+    }
+
+    #[test]
+    fn test_format_default_matches_serde_json() {
+        let value = json!({
+            "colors": ["red", "blue", "taupe"],
+            "sub": {
+                "name": "Foo",
+                "on": true,
+                "size": 17
+            }
+        });
+        assert_eq!(
+            JsonOptions::new().format_to_string(&value).unwrap(),
+            serde_json::to_string(&value).unwrap(),
+        );
+    }
+
+    #[test]
+    fn test_format_pretty_matches_serde_json() {
+        let value = json!({
+            "colors": ["red", "blue", "taupe"],
+            "sub": {
+                "name": "Foo",
+                "on": true,
+                "size": 17
+            }
+        });
+        assert_eq!(
+            JsonOptions::pretty().format_to_string(&value).unwrap(),
+            serde_json::to_string_pretty(&value).unwrap(),
+        );
+    }
+
+    #[test]
+    fn test_format_pretty_complicated() {
+        let value = json!({
+            "colors": [
+                "red",
+                "blue",
+                "taupe"
+            ],
+            "sampler": {
+                "empty_list": [],
+                "empty_object": {},
+                "nested": {
+                    "list": [
+                        1,
+                        {
+                            "strange": "charmed",
+                            "truth": "beauty",
+                            "up": "down"
+                        },
+                        3
+                    ],
+                },
+                "null": null,
+                "singleton_list": [
+                    42
+                ],
+                "singleton_object": {
+                    "key": "value"
+                }
+            },
+            "sub": {
+                "name": "Foo",
+                "size": 17,
+                "on": true
+            }
+        });
+        let s = JsonOptions::pretty().format_to_string(&value).unwrap();
+        assert_eq!(
+            s,
+            indoc! {r#"{
+              "colors": [
+                "red",
+                "blue",
+                "taupe"
+              ],
+              "sampler": {
+                "empty_list": [],
+                "empty_object": {},
+                "nested": {
+                  "list": [
+                    1,
+                    {
+                      "strange": "charmed",
+                      "truth": "beauty",
+                      "up": "down"
+                    },
+                    3
+                  ]
+                },
+                "null": null,
+                "singleton_list": [
+                  42
+                ],
+                "singleton_object": {
+                  "key": "value"
+                }
+              },
+              "sub": {
+                "name": "Foo",
+                "on": true,
+                "size": 17
+              }
+            }"#}
+        );
+    }
+
+    #[test]
+    fn test_format_pretty_complicated_indent_4() {
+        let value = json!({
+            "colors": [
+                "red",
+                "blue",
+                "taupe"
+            ],
+            "sampler": {
+                "empty_list": [],
+                "empty_object": {},
+                "nested": {
+                    "list": [
+                        1,
+                        {
+                            "strange": "charmed",
+                            "truth": "beauty",
+                            "up": "down"
+                        },
+                        3
+                    ],
+                },
+                "null": null,
+                "singleton_list": [
+                    42
+                ],
+                "singleton_object": {
+                    "key": "value"
+                }
+            },
+            "sub": {
+                "name": "Foo",
+                "size": 17,
+                "on": true
+            }
+        });
+        let s = JsonOptions::pretty()
+            .indent_width(Some(4))
+            .format_to_string(&value)
+            .unwrap();
+        assert_eq!(
+            s,
+            indoc! {r#"{
+                "colors": [
+                    "red",
+                    "blue",
+                    "taupe"
+                ],
+                "sampler": {
+                    "empty_list": [],
+                    "empty_object": {},
+                    "nested": {
+                        "list": [
+                            1,
+                            {
+                                "strange": "charmed",
+                                "truth": "beauty",
+                                "up": "down"
+                            },
+                            3
+                        ]
+                    },
+                    "null": null,
+                    "singleton_list": [
+                        42
+                    ],
+                    "singleton_object": {
+                        "key": "value"
+                    }
+                },
+                "sub": {
+                    "name": "Foo",
+                    "on": true,
+                    "size": 17
+                }
+            }"#}
+        );
+    }
+
+    #[test]
+    fn test_format_pretty_empty_indent() {
+        let value = json!({
+            "nested": {
+                "list": [
+                    1,
+                    {
+                        "strange": "charmed",
+                        "truth": "beauty",
+                        "up": "down"
+                    },
+                    3
+                ]
+            }
+        });
+        let s = JsonOptions::pretty()
+            .indent(Some(""))
+            .unwrap()
+            .format_to_string(&value)
+            .unwrap();
+        assert_eq!(
+            s,
+            indoc! {r#"{
+            "nested": {
+            "list": [
+            1,
+            {
+            "strange": "charmed",
+            "truth": "beauty",
+            "up": "down"
+            },
+            3
+            ]
+            }
+            }"#}
+        );
+    }
+
+    #[test]
+    fn test_format_pretty_zero_indent_width() {
+        let value = json!({
+            "nested": {
+                "list": [
+                    1,
+                    {
+                        "strange": "charmed",
+                        "truth": "beauty",
+                        "up": "down"
+                    },
+                    3
+                ]
+            }
+        });
+        let s = JsonOptions::pretty()
+            .indent_width(Some(0))
+            .format_to_string(&value)
+            .unwrap();
+        assert_eq!(
+            s,
+            indoc! {r#"{
+            "nested": {
+            "list": [
+            1,
+            {
+            "strange": "charmed",
+            "truth": "beauty",
+            "up": "down"
+            },
+            3
+            ]
+            }
+            }"#}
+        );
+    }
+
+    #[test]
+    fn test_format_pretty_tab_indent() {
+        let value = json!({
+            "nested": {
+                "list": [
+                    1,
+                    {
+                        "strange": "charmed",
+                        "truth": "beauty",
+                        "up": "down"
+                    },
+                    3
+                ]
+            }
+        });
+        let s = JsonOptions::pretty()
+            .indent(Some("\t"))
+            .unwrap()
+            .format_to_string(&value)
+            .unwrap();
+        assert_eq!(
+            s,
+            indoc! {"{
+            \t\"nested\": {
+            \t\t\"list\": [
+            \t\t\t1,
+            \t\t\t{
+            \t\t\t\t\"strange\": \"charmed\",
+            \t\t\t\t\"truth\": \"beauty\",
+            \t\t\t\t\"up\": \"down\"
+            \t\t\t},
+            \t\t\t3
+            \t\t]
+            \t}
+            }"}
+        );
+    }
+
+    #[test]
+    fn test_format_spaced_separators() {
+        let value = json!({
+            "colors": ["red", "blue", "taupe"],
+            "sub": {
+                "name": "Foo",
+                "on": true,
+                "size": 17
+            }
+        });
+        let s = JsonOptions::new()
+            .comma(", ")
+            .unwrap()
+            .colon(": ")
+            .unwrap()
+            .format_to_string(&value)
+            .unwrap();
+        assert_eq!(
+            s,
+            r#"{"colors": ["red", "blue", "taupe"], "sub": {"name": "Foo", "on": true, "size": 17}}"#
+        );
+    }
+
+    #[test]
+    fn test_format_weird_separators() {
+        let value = json!({
+            "colors": ["red", "blue", "taupe"],
+            "sub": {
+                "name": "Foo",
+                "on": true,
+                "size": 17
+            }
+        });
+        let s = JsonOptions::new()
+            .comma("\n,")
+            .unwrap()
+            .colon("\t:\t")
+            .unwrap()
+            .format_to_string(&value)
+            .unwrap();
+        assert_eq!(
+            s,
+            "{\"colors\"\t:\t[\"red\"\n,\"blue\"\n,\"taupe\"]\n,\"sub\"\t:\t{\"name\"\t:\t\"Foo\"\n,\"on\"\t:\ttrue\n,\"size\"\t:\t17}}"
+        );
+    }
+
+    #[test]
+    fn test_format_unicode() {
+        let value = json!({
+            "föö": "snow☃man",
+            "\u{1F410}": "\u{1F600}",
+        });
+        let s = JsonOptions::new().format_to_string(&value).unwrap();
+        assert_eq!(s, "{\"föö\":\"snow☃man\",\"\u{1F410}\":\"\u{1F600}\"}");
+    }
+
+    #[test]
+    fn test_format_unicode_in_ascii() {
+        let value = json!({
+            "föö": "snow☃man",
+            "\u{1F410}": "\u{1F600}",
+        });
+        let s = JsonOptions::new()
+            .ascii(true)
+            .format_to_string(&value)
+            .unwrap();
+        assert_eq!(
+            s,
+            r#"{"f\u00f6\u00f6":"snow\u2603man","\ud83d\udc10":"\ud83d\ude00"}"#
+        );
+    }
+
+    #[test]
+    fn test_format_top_level_array() {
+        let value = json!(["apple", ["banana"], {"grape": "raisin"}]);
+        let s = JsonOptions::new().format_to_string(&value).unwrap();
+        assert_eq!(s, r#"["apple",["banana"],{"grape":"raisin"}]"#);
+    }
+
+    #[test]
+    fn test_format_top_level_array_pretty() {
+        let value = json!(["apple", ["banana"], {"grape": "raisin"}]);
+        let s = JsonOptions::pretty().format_to_string(&value).unwrap();
+        assert_eq!(
+            s,
+            indoc! {r#"[
+              "apple",
+              [
+                "banana"
+              ],
+              {
+                "grape": "raisin"
+              }
+            ]"#}
+        );
+    }
+
+    #[test]
+    fn test_format_top_level_int() {
+        let s = JsonOptions::new().format_to_string(&42).unwrap();
+        assert_eq!(s, "42");
+    }
+
+    #[test]
+    fn test_format_top_level_int_pretty() {
+        let s = JsonOptions::pretty().format_to_string(&42).unwrap();
+        assert_eq!(s, "42");
+    }
+
+    #[test]
+    fn test_format_top_level_float() {
+        let s = JsonOptions::new().format_to_string(&6.022).unwrap();
+        assert_eq!(s, "6.022");
+    }
+
+    #[test]
+    fn test_format_top_level_float_pretty() {
+        let s = JsonOptions::pretty().format_to_string(&6.022).unwrap();
+        assert_eq!(s, "6.022");
+    }
+
+    #[test]
+    fn test_format_top_level_string() {
+        let s = JsonOptions::new().format_to_string("foo").unwrap();
+        assert_eq!(s, r#""foo""#);
+    }
+
+    #[test]
+    fn test_format_top_level_string_pretty() {
+        let s = JsonOptions::pretty().format_to_string("foo").unwrap();
+        assert_eq!(s, r#""foo""#);
+    }
+
+    #[test]
+    fn test_format_top_level_bool() {
+        let s = JsonOptions::new().format_to_string(&true).unwrap();
+        assert_eq!(s, "true");
+    }
+
+    #[test]
+    fn test_format_top_level_bool_pretty() {
+        let s = JsonOptions::pretty().format_to_string(&true).unwrap();
+        assert_eq!(s, "true");
+    }
+
+    #[test]
+    fn test_format_top_level_null() {
+        let value = json!(null);
+        let s = JsonOptions::new().format_to_string(&value).unwrap();
+        assert_eq!(s, "null");
+    }
+
+    #[test]
+    fn test_format_top_level_null_pretty() {
+        let value = json!(null);
+        let s = JsonOptions::pretty().format_to_string(&value).unwrap();
+        assert_eq!(s, "null");
     }
 }
