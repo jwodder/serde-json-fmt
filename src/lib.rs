@@ -498,9 +498,9 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use Error::*;
         match self {
-            InvalidCharacter(c) => write!(f, "String contains unexpected character {c:?}"),
-            MissingSeparator(c) => write!(f, "No occurrence of {c:?} found in string"),
-            MultipleSeparators(c) => write!(f, "Multiple occurrences of {c:?} found in string"),
+            InvalidCharacter(c) => write!(f, "string contains unexpected character {c:?}"),
+            MissingSeparator(c) => write!(f, "no occurrence of {c:?} found in string"),
+            MultipleSeparators(c) => write!(f, "multiple occurrences of {c:?} found in string"),
         }
     }
 }
@@ -1167,18 +1167,18 @@ mod tests {
     #[test]
     fn test_display_invalid_character() {
         let e = Error::InvalidCharacter('ö');
-        assert_eq!(e.to_string(), "String contains unexpected character 'ö'");
+        assert_eq!(e.to_string(), "string contains unexpected character 'ö'");
     }
 
     #[test]
     fn test_display_missing_separator() {
         let e = Error::MissingSeparator('?');
-        assert_eq!(e.to_string(), "No occurrence of '?' found in string");
+        assert_eq!(e.to_string(), "no occurrence of '?' found in string");
     }
 
     #[test]
     fn test_display_multiple_separators() {
         let e = Error::MultipleSeparators('?');
-        assert_eq!(e.to_string(), "Multiple occurrences of '?' found in string");
+        assert_eq!(e.to_string(), "multiple occurrences of '?' found in string");
     }
 }
