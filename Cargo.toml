@@ -2,9 +2,13 @@
 name = "serde-json-fmt"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.60"
+description = "Configurable formatting for serde-json serialization"
 authors = ["John Thorvald Wodder II <serde-json-fmt@varonathe.org>"]
 repository = "https://github.com/jwodder/serde-json-fmt"
 license = "MIT"
+keywords = ["json", "serde", "serde-json"]
+categories = ["encoding", "value-formatting"]
 exclude = ["/.*"]
 
 [dependencies]
