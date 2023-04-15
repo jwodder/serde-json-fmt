@@ -1,3 +1,77 @@
+//! Configurable formatting for serde-json serialization
+//!
+//! The `serde-json-fmt` crate lets you create custom [`serde_json`] formatters
+//! with the indentation, separators, and ASCII requirements of your choice.
+//!
+//! `serde_json` itself only directly provides the ability to produce JSON in
+//! either "compact" form or "pretty" form, with the only customizable aspect
+//! being the string used for pretty indentation.  `serde-json-fmt` complements
+//! `serde_json` to let you also customize the whitespace around commas &
+//! colons and whether to escape non-ASCII characters.
+//!
+//! # Examples
+//!
+//! Say you want to serialize a value in one-line "compact" form, but you want
+//! a space after each colon & comma, something that `serde_json`'s compact
+//! form doesn't do.  `serde-json-fmt` lets you do that:
+//!
+//! ```
+//! use serde_json::json;
+//! use serde_json_fmt::JsonOptions;
+//!
+//! let value = json!({
+//!     "colors": ["red", "blue", "taupe"],
+//!     "sub": {
+//!         "name": "Foo",
+//!         "on": true,
+//!         "size": 17
+//!     }
+//! });
+//!
+//! let s = JsonOptions::new()
+//!     .comma(", ")
+//!     .unwrap()
+//!     .colon(": ")
+//!     .unwrap()
+//!     .format_to_string(&value)
+//!     .unwrap();
+//!
+//! assert_eq!(
+//!     s,
+//!     r#"{"colors": ["red", "blue", "taupe"], "sub": {"name": "Foo", "on": true, "size": 17}}"#
+//! );
+//! ```
+//!
+//! Say you want to format a value in multiline "pretty" form, but using
+//! four-space indents and with all non-ASCII characters encoded as `\uXXXX`
+//! escape sequences.  `serde-json-fmt` lets you do that:
+//!
+//! ```
+//! use serde_json::json;
+//! use serde_json_fmt::JsonOptions;
+//!
+//! let value = json!({
+//!     "föö": "snow☃man",
+//!     "🐐": "😀",
+//! });
+//!
+//! let s = JsonOptions::pretty()
+//!     .indent_width(Some(4))
+//!     .ascii(true)
+//!     .format_to_string(&value)
+//!     .unwrap();
+//!
+//! assert_eq!(
+//!     s,
+//!     concat!(
+//!         "{\n",
+//!         "    \"f\\u00f6\\u00f6\": \"snow\\u2603man\",\n",
+//!         "    \"\\ud83d\\udc10\": \"\\ud83d\\ude00\"\n",
+//!         "}",
+//!     )
+//! );
+//! ```
+
 use serde::Serialize;
 use serde_json::ser::Formatter;
 use serde_json::Serializer;
