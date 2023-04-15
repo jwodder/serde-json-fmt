@@ -165,7 +165,7 @@ impl JsonFormat {
     /// # Errors
     ///
     /// Returns `Err` if `s` does not meet the above requirements.
-    pub fn comma<S: AsRef<str>>(mut self, s: S) -> Result<Self, Error> {
+    pub fn comma<S: AsRef<str>>(mut self, s: S) -> Result<Self, JsonSyntaxError> {
         self.comma = validate_string(s, Some(','))?;
         Ok(self)
     }
@@ -179,7 +179,7 @@ impl JsonFormat {
     /// # Errors
     ///
     /// Returns `Err` if `s` does not meet the above requirements.
-    pub fn colon<S: AsRef<str>>(mut self, s: S) -> Result<Self, Error> {
+    pub fn colon<S: AsRef<str>>(mut self, s: S) -> Result<Self, JsonSyntaxError> {
         self.colon = validate_string(s, Some(':'))?;
         Ok(self)
     }
@@ -196,7 +196,7 @@ impl JsonFormat {
     ///
     /// Returns `Err` if `s` contains a string that contains any character
     /// other than those listed above.
-    pub fn indent<S: AsRef<str>>(mut self, s: Option<S>) -> Result<Self, Error> {
+    pub fn indent<S: AsRef<str>>(mut self, s: Option<S>) -> Result<Self, JsonSyntaxError> {
         self.indent = s.map(|s| validate_string(s, None)).transpose()?;
         Ok(self)
     }
@@ -478,7 +478,7 @@ pub type JsonFrmtr<'a> = internal::JsonFormatterBase<internal::JsonFmt<'a>>;
 /// Error returned when an invalid string is passed to certain [`JsonFormat`]
 /// methods.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum Error {
+pub enum JsonSyntaxError {
     /// Returned when the given string contains an invalid/unexpected
     /// character.  Contains the character in question.
     InvalidCharacter(char),
@@ -494,9 +494,9 @@ pub enum Error {
     MultipleSeparators(char),
 }
 
-impl fmt::Display for Error {
+impl fmt::Display for JsonSyntaxError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use Error::*;
+        use JsonSyntaxError::*;
         match self {
             InvalidCharacter(c) => write!(f, "string contains unexpected character {c:?}"),
             MissingSeparator(c) => write!(f, "no occurrence of {c:?} found in string"),
@@ -505,26 +505,29 @@ impl fmt::Display for Error {
     }
 }
 
-impl std::error::Error for Error {}
+impl std::error::Error for JsonSyntaxError {}
 
-fn validate_string<S: AsRef<str>>(s: S, sep: Option<char>) -> Result<CompactString, Error> {
+fn validate_string<S: AsRef<str>>(
+    s: S,
+    sep: Option<char>,
+) -> Result<CompactString, JsonSyntaxError> {
     let s = s.as_ref();
     let mut seen_sep = false;
     for ch in s.chars() {
         match (sep, ch) {
             (Some(sep_), ch) if sep_ == ch => {
                 if std::mem::replace(&mut seen_sep, true) {
-                    return Err(Error::MultipleSeparators(sep_));
+                    return Err(JsonSyntaxError::MultipleSeparators(sep_));
                 }
             }
             // RFC 8259, section 2
             (_, ' ' | '\t' | '\n' | '\r') => (),
-            (_, ch) => return Err(Error::InvalidCharacter(ch)),
+            (_, ch) => return Err(JsonSyntaxError::InvalidCharacter(ch)),
         }
     }
     if let Some(sep_) = sep {
         if !seen_sep {
-            return Err(Error::MissingSeparator(sep_));
+            return Err(JsonSyntaxError::MissingSeparator(sep_));
         }
     }
     Ok(s.into())
@@ -543,52 +546,55 @@ mod tests {
     #[case("? ", Ok("? ".into()))]
     #[case("  ? ", Ok("  ? ".into()))]
     #[case(" \t?\r\n", Ok(" \t?\r\n".into()))]
-    #[case("", Err(Error::MissingSeparator('?')))]
-    #[case(" ", Err(Error::MissingSeparator('?')))]
-    #[case("??", Err(Error::MultipleSeparators('?')))]
-    #[case("? ?", Err(Error::MultipleSeparators('?')))]
-    #[case("\x0C", Err(Error::InvalidCharacter('\x0C')))]
-    #[case("\x0B", Err(Error::InvalidCharacter('\x0B')))]
-    #[case("\u{A0}", Err(Error::InvalidCharacter('\u{A0}')))]
-    #[case("\u{85}", Err(Error::InvalidCharacter('\u{85}')))]
-    #[case("\u{1680}", Err(Error::InvalidCharacter('\u{1680}')))]
-    #[case("\u{180E}", Err(Error::InvalidCharacter('\u{180E}')))]
-    #[case("\u{2000}", Err(Error::InvalidCharacter('\u{2000}')))]
-    #[case("\u{2001}", Err(Error::InvalidCharacter('\u{2001}')))]
-    #[case("\u{2002}", Err(Error::InvalidCharacter('\u{2002}')))]
-    #[case("\u{2003}", Err(Error::InvalidCharacter('\u{2003}')))]
-    #[case("\u{2004}", Err(Error::InvalidCharacter('\u{2004}')))]
-    #[case("\u{2005}", Err(Error::InvalidCharacter('\u{2005}')))]
-    #[case("\u{2006}", Err(Error::InvalidCharacter('\u{2006}')))]
-    #[case("\u{2007}", Err(Error::InvalidCharacter('\u{2007}')))]
-    #[case("\u{2008}", Err(Error::InvalidCharacter('\u{2008}')))]
-    #[case("\u{2009}", Err(Error::InvalidCharacter('\u{2009}')))]
-    #[case("\u{200A}", Err(Error::InvalidCharacter('\u{200A}')))]
-    #[case("\u{200B}", Err(Error::InvalidCharacter('\u{200B}')))]
-    #[case("\u{200C}", Err(Error::InvalidCharacter('\u{200C}')))]
-    #[case("\u{200D}", Err(Error::InvalidCharacter('\u{200D}')))]
-    #[case("\u{2028}", Err(Error::InvalidCharacter('\u{2028}')))]
-    #[case("\u{2029}", Err(Error::InvalidCharacter('\u{2029}')))]
-    #[case("\u{202F}", Err(Error::InvalidCharacter('\u{202F}')))]
-    #[case("\u{205F}", Err(Error::InvalidCharacter('\u{205F}')))]
-    #[case("\u{2060}", Err(Error::InvalidCharacter('\u{2060}')))]
-    #[case("\u{3000}", Err(Error::InvalidCharacter('\u{3000}')))]
-    #[case("\u{FEFF}", Err(Error::InvalidCharacter('\u{FEFF}')))]
-    #[case("\x0C?", Err(Error::InvalidCharacter('\x0C')))]
-    #[case("?\x0C", Err(Error::InvalidCharacter('\x0C')))]
-    #[case("?\x0C?", Err(Error::InvalidCharacter('\x0C')))]
-    #[case("??\x0C", Err(Error::MultipleSeparators('?')))]
-    #[case(".", Err(Error::InvalidCharacter('.')))]
-    #[case(".?", Err(Error::InvalidCharacter('.')))]
-    #[case("?.", Err(Error::InvalidCharacter('.')))]
-    #[case("?.?", Err(Error::InvalidCharacter('.')))]
-    #[case("??.", Err(Error::MultipleSeparators('?')))]
-    #[case("☃", Err(Error::InvalidCharacter('☃')))]
-    #[case("☃?", Err(Error::InvalidCharacter('☃')))]
-    #[case("?☃", Err(Error::InvalidCharacter('☃')))]
-    #[case("?☃?", Err(Error::InvalidCharacter('☃')))]
-    #[case("??☃", Err(Error::MultipleSeparators('?')))]
-    fn test_validate_string_sep(#[case] s: &str, #[case] r: Result<CompactString, Error>) {
+    #[case("", Err(JsonSyntaxError::MissingSeparator('?')))]
+    #[case(" ", Err(JsonSyntaxError::MissingSeparator('?')))]
+    #[case("??", Err(JsonSyntaxError::MultipleSeparators('?')))]
+    #[case("? ?", Err(JsonSyntaxError::MultipleSeparators('?')))]
+    #[case("\x0C", Err(JsonSyntaxError::InvalidCharacter('\x0C')))]
+    #[case("\x0B", Err(JsonSyntaxError::InvalidCharacter('\x0B')))]
+    #[case("\u{A0}", Err(JsonSyntaxError::InvalidCharacter('\u{A0}')))]
+    #[case("\u{85}", Err(JsonSyntaxError::InvalidCharacter('\u{85}')))]
+    #[case("\u{1680}", Err(JsonSyntaxError::InvalidCharacter('\u{1680}')))]
+    #[case("\u{180E}", Err(JsonSyntaxError::InvalidCharacter('\u{180E}')))]
+    #[case("\u{2000}", Err(JsonSyntaxError::InvalidCharacter('\u{2000}')))]
+    #[case("\u{2001}", Err(JsonSyntaxError::InvalidCharacter('\u{2001}')))]
+    #[case("\u{2002}", Err(JsonSyntaxError::InvalidCharacter('\u{2002}')))]
+    #[case("\u{2003}", Err(JsonSyntaxError::InvalidCharacter('\u{2003}')))]
+    #[case("\u{2004}", Err(JsonSyntaxError::InvalidCharacter('\u{2004}')))]
+    #[case("\u{2005}", Err(JsonSyntaxError::InvalidCharacter('\u{2005}')))]
+    #[case("\u{2006}", Err(JsonSyntaxError::InvalidCharacter('\u{2006}')))]
+    #[case("\u{2007}", Err(JsonSyntaxError::InvalidCharacter('\u{2007}')))]
+    #[case("\u{2008}", Err(JsonSyntaxError::InvalidCharacter('\u{2008}')))]
+    #[case("\u{2009}", Err(JsonSyntaxError::InvalidCharacter('\u{2009}')))]
+    #[case("\u{200A}", Err(JsonSyntaxError::InvalidCharacter('\u{200A}')))]
+    #[case("\u{200B}", Err(JsonSyntaxError::InvalidCharacter('\u{200B}')))]
+    #[case("\u{200C}", Err(JsonSyntaxError::InvalidCharacter('\u{200C}')))]
+    #[case("\u{200D}", Err(JsonSyntaxError::InvalidCharacter('\u{200D}')))]
+    #[case("\u{2028}", Err(JsonSyntaxError::InvalidCharacter('\u{2028}')))]
+    #[case("\u{2029}", Err(JsonSyntaxError::InvalidCharacter('\u{2029}')))]
+    #[case("\u{202F}", Err(JsonSyntaxError::InvalidCharacter('\u{202F}')))]
+    #[case("\u{205F}", Err(JsonSyntaxError::InvalidCharacter('\u{205F}')))]
+    #[case("\u{2060}", Err(JsonSyntaxError::InvalidCharacter('\u{2060}')))]
+    #[case("\u{3000}", Err(JsonSyntaxError::InvalidCharacter('\u{3000}')))]
+    #[case("\u{FEFF}", Err(JsonSyntaxError::InvalidCharacter('\u{FEFF}')))]
+    #[case("\x0C?", Err(JsonSyntaxError::InvalidCharacter('\x0C')))]
+    #[case("?\x0C", Err(JsonSyntaxError::InvalidCharacter('\x0C')))]
+    #[case("?\x0C?", Err(JsonSyntaxError::InvalidCharacter('\x0C')))]
+    #[case("??\x0C", Err(JsonSyntaxError::MultipleSeparators('?')))]
+    #[case(".", Err(JsonSyntaxError::InvalidCharacter('.')))]
+    #[case(".?", Err(JsonSyntaxError::InvalidCharacter('.')))]
+    #[case("?.", Err(JsonSyntaxError::InvalidCharacter('.')))]
+    #[case("?.?", Err(JsonSyntaxError::InvalidCharacter('.')))]
+    #[case("??.", Err(JsonSyntaxError::MultipleSeparators('?')))]
+    #[case("☃", Err(JsonSyntaxError::InvalidCharacter('☃')))]
+    #[case("☃?", Err(JsonSyntaxError::InvalidCharacter('☃')))]
+    #[case("?☃", Err(JsonSyntaxError::InvalidCharacter('☃')))]
+    #[case("?☃?", Err(JsonSyntaxError::InvalidCharacter('☃')))]
+    #[case("??☃", Err(JsonSyntaxError::MultipleSeparators('?')))]
+    fn test_validate_string_sep(
+        #[case] s: &str,
+        #[case] r: Result<CompactString, JsonSyntaxError>,
+    ) {
         assert_eq!(validate_string(s, Some('?')), r);
     }
 
@@ -597,50 +603,53 @@ mod tests {
     #[case(" ", Ok(" ".into()))]
     #[case("    ", Ok("    ".into()))]
     #[case(" \t\r\n", Ok(" \t\r\n".into()))]
-    #[case("?", Err(Error::InvalidCharacter('?')))]
-    #[case(" ?", Err(Error::InvalidCharacter('?')))]
-    #[case("? ", Err(Error::InvalidCharacter('?')))]
-    #[case("  ? ", Err(Error::InvalidCharacter('?')))]
-    #[case("??", Err(Error::InvalidCharacter('?')))]
-    #[case("\x0C", Err(Error::InvalidCharacter('\x0C')))]
-    #[case("\x0B", Err(Error::InvalidCharacter('\x0B')))]
-    #[case("\u{A0}", Err(Error::InvalidCharacter('\u{A0}')))]
-    #[case("\u{85}", Err(Error::InvalidCharacter('\u{85}')))]
-    #[case("\u{1680}", Err(Error::InvalidCharacter('\u{1680}')))]
-    #[case("\u{180E}", Err(Error::InvalidCharacter('\u{180E}')))]
-    #[case("\u{2000}", Err(Error::InvalidCharacter('\u{2000}')))]
-    #[case("\u{2001}", Err(Error::InvalidCharacter('\u{2001}')))]
-    #[case("\u{2002}", Err(Error::InvalidCharacter('\u{2002}')))]
-    #[case("\u{2003}", Err(Error::InvalidCharacter('\u{2003}')))]
-    #[case("\u{2004}", Err(Error::InvalidCharacter('\u{2004}')))]
-    #[case("\u{2005}", Err(Error::InvalidCharacter('\u{2005}')))]
-    #[case("\u{2006}", Err(Error::InvalidCharacter('\u{2006}')))]
-    #[case("\u{2007}", Err(Error::InvalidCharacter('\u{2007}')))]
-    #[case("\u{2008}", Err(Error::InvalidCharacter('\u{2008}')))]
-    #[case("\u{2009}", Err(Error::InvalidCharacter('\u{2009}')))]
-    #[case("\u{200A}", Err(Error::InvalidCharacter('\u{200A}')))]
-    #[case("\u{200B}", Err(Error::InvalidCharacter('\u{200B}')))]
-    #[case("\u{200C}", Err(Error::InvalidCharacter('\u{200C}')))]
-    #[case("\u{200D}", Err(Error::InvalidCharacter('\u{200D}')))]
-    #[case("\u{2028}", Err(Error::InvalidCharacter('\u{2028}')))]
-    #[case("\u{2029}", Err(Error::InvalidCharacter('\u{2029}')))]
-    #[case("\u{202F}", Err(Error::InvalidCharacter('\u{202F}')))]
-    #[case("\u{205F}", Err(Error::InvalidCharacter('\u{205F}')))]
-    #[case("\u{2060}", Err(Error::InvalidCharacter('\u{2060}')))]
-    #[case("\u{3000}", Err(Error::InvalidCharacter('\u{3000}')))]
-    #[case("\u{FEFF}", Err(Error::InvalidCharacter('\u{FEFF}')))]
-    #[case("\x0C ", Err(Error::InvalidCharacter('\x0C')))]
-    #[case(" \x0C", Err(Error::InvalidCharacter('\x0C')))]
-    #[case(" \x0C ", Err(Error::InvalidCharacter('\x0C')))]
-    #[case(".", Err(Error::InvalidCharacter('.')))]
-    #[case(". ", Err(Error::InvalidCharacter('.')))]
-    #[case(" .", Err(Error::InvalidCharacter('.')))]
-    #[case(" . ", Err(Error::InvalidCharacter('.')))]
-    #[case("☃", Err(Error::InvalidCharacter('☃')))]
-    #[case("☃ ", Err(Error::InvalidCharacter('☃')))]
-    #[case(" ☃", Err(Error::InvalidCharacter('☃')))]
-    #[case(" ☃ ", Err(Error::InvalidCharacter('☃')))]
-    fn test_validate_string_no_sep(#[case] s: &str, #[case] r: Result<CompactString, Error>) {
+    #[case("?", Err(JsonSyntaxError::InvalidCharacter('?')))]
+    #[case(" ?", Err(JsonSyntaxError::InvalidCharacter('?')))]
+    #[case("? ", Err(JsonSyntaxError::InvalidCharacter('?')))]
+    #[case("  ? ", Err(JsonSyntaxError::InvalidCharacter('?')))]
+    #[case("??", Err(JsonSyntaxError::InvalidCharacter('?')))]
+    #[case("\x0C", Err(JsonSyntaxError::InvalidCharacter('\x0C')))]
+    #[case("\x0B", Err(JsonSyntaxError::InvalidCharacter('\x0B')))]
+    #[case("\u{A0}", Err(JsonSyntaxError::InvalidCharacter('\u{A0}')))]
+    #[case("\u{85}", Err(JsonSyntaxError::InvalidCharacter('\u{85}')))]
+    #[case("\u{1680}", Err(JsonSyntaxError::InvalidCharacter('\u{1680}')))]
+    #[case("\u{180E}", Err(JsonSyntaxError::InvalidCharacter('\u{180E}')))]
+    #[case("\u{2000}", Err(JsonSyntaxError::InvalidCharacter('\u{2000}')))]
+    #[case("\u{2001}", Err(JsonSyntaxError::InvalidCharacter('\u{2001}')))]
+    #[case("\u{2002}", Err(JsonSyntaxError::InvalidCharacter('\u{2002}')))]
+    #[case("\u{2003}", Err(JsonSyntaxError::InvalidCharacter('\u{2003}')))]
+    #[case("\u{2004}", Err(JsonSyntaxError::InvalidCharacter('\u{2004}')))]
+    #[case("\u{2005}", Err(JsonSyntaxError::InvalidCharacter('\u{2005}')))]
+    #[case("\u{2006}", Err(JsonSyntaxError::InvalidCharacter('\u{2006}')))]
+    #[case("\u{2007}", Err(JsonSyntaxError::InvalidCharacter('\u{2007}')))]
+    #[case("\u{2008}", Err(JsonSyntaxError::InvalidCharacter('\u{2008}')))]
+    #[case("\u{2009}", Err(JsonSyntaxError::InvalidCharacter('\u{2009}')))]
+    #[case("\u{200A}", Err(JsonSyntaxError::InvalidCharacter('\u{200A}')))]
+    #[case("\u{200B}", Err(JsonSyntaxError::InvalidCharacter('\u{200B}')))]
+    #[case("\u{200C}", Err(JsonSyntaxError::InvalidCharacter('\u{200C}')))]
+    #[case("\u{200D}", Err(JsonSyntaxError::InvalidCharacter('\u{200D}')))]
+    #[case("\u{2028}", Err(JsonSyntaxError::InvalidCharacter('\u{2028}')))]
+    #[case("\u{2029}", Err(JsonSyntaxError::InvalidCharacter('\u{2029}')))]
+    #[case("\u{202F}", Err(JsonSyntaxError::InvalidCharacter('\u{202F}')))]
+    #[case("\u{205F}", Err(JsonSyntaxError::InvalidCharacter('\u{205F}')))]
+    #[case("\u{2060}", Err(JsonSyntaxError::InvalidCharacter('\u{2060}')))]
+    #[case("\u{3000}", Err(JsonSyntaxError::InvalidCharacter('\u{3000}')))]
+    #[case("\u{FEFF}", Err(JsonSyntaxError::InvalidCharacter('\u{FEFF}')))]
+    #[case("\x0C ", Err(JsonSyntaxError::InvalidCharacter('\x0C')))]
+    #[case(" \x0C", Err(JsonSyntaxError::InvalidCharacter('\x0C')))]
+    #[case(" \x0C ", Err(JsonSyntaxError::InvalidCharacter('\x0C')))]
+    #[case(".", Err(JsonSyntaxError::InvalidCharacter('.')))]
+    #[case(". ", Err(JsonSyntaxError::InvalidCharacter('.')))]
+    #[case(" .", Err(JsonSyntaxError::InvalidCharacter('.')))]
+    #[case(" . ", Err(JsonSyntaxError::InvalidCharacter('.')))]
+    #[case("☃", Err(JsonSyntaxError::InvalidCharacter('☃')))]
+    #[case("☃ ", Err(JsonSyntaxError::InvalidCharacter('☃')))]
+    #[case(" ☃", Err(JsonSyntaxError::InvalidCharacter('☃')))]
+    #[case(" ☃ ", Err(JsonSyntaxError::InvalidCharacter('☃')))]
+    fn test_validate_string_no_sep(
+        #[case] s: &str,
+        #[case] r: Result<CompactString, JsonSyntaxError>,
+    ) {
         assert_eq!(validate_string(s, None), r);
     }
 
@@ -1166,19 +1175,19 @@ mod tests {
 
     #[test]
     fn test_display_invalid_character() {
-        let e = Error::InvalidCharacter('ö');
+        let e = JsonSyntaxError::InvalidCharacter('ö');
         assert_eq!(e.to_string(), "string contains unexpected character 'ö'");
     }
 
     #[test]
     fn test_display_missing_separator() {
-        let e = Error::MissingSeparator('?');
+        let e = JsonSyntaxError::MissingSeparator('?');
         assert_eq!(e.to_string(), "no occurrence of '?' found in string");
     }
 
     #[test]
     fn test_display_multiple_separators() {
-        let e = Error::MultipleSeparators('?');
+        let e = JsonSyntaxError::MultipleSeparators('?');
         assert_eq!(e.to_string(), "multiple occurrences of '?' found in string");
     }
 }
