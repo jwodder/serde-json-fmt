@@ -6,19 +6,18 @@ use std::fmt;
 use std::io::{self, Write};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-// TODO: Rename to "JSONOptions"?
-pub struct JSONFormat {
+pub struct JsonOptions {
     indent: Option<CompactString>,
     comma: CompactString,
     colon: CompactString,
     ascii: bool,
 }
 
-impl JSONFormat {
+impl JsonOptions {
     // Uses serde-json's default/"compact" formatting
     // Note that this format omits spaces from the comma & colon separators
     pub fn new() -> Self {
-        JSONFormat {
+        JsonOptions {
             indent: None,
             comma: ",".into(),
             colon: ":".into(),
@@ -28,7 +27,7 @@ impl JSONFormat {
 
     // Uses serde-json's "pretty" formatting
     pub fn pretty() -> Self {
-        JSONFormat {
+        JsonOptions {
             indent: Some("  ".into()),
             comma: ", ".into(),
             colon: ": ".into(),
@@ -80,12 +79,12 @@ impl JSONFormat {
         self.indent(n.map(|i| " ".repeat(i))).unwrap()
     }
 
-    pub fn build(self) -> JSONFormatterOwned {
-        JSONFormatterOwned::new(self)
+    pub fn build(self) -> JsonFormatterOwned {
+        JsonFormatterOwned::new(self)
     }
 
-    pub fn as_formatter(&self) -> JSONFormatter<'_> {
-        JSONFormatter::new(JSONFormatRef {
+    pub fn as_formatter(&self) -> JsonFormatter<'_> {
+        JsonFormatter::new(JsonOptionsRef {
             indent: self.indent.as_ref().map(|s| s.as_bytes()),
             comma: self.comma.as_bytes(),
             colon: self.colon.as_bytes(),
@@ -120,9 +119,9 @@ impl JSONFormat {
     }
 }
 
-impl Default for JSONFormat {
+impl Default for JsonOptions {
     fn default() -> Self {
-        JSONFormat::new()
+        JsonOptions::new()
     }
 }
 
@@ -133,7 +132,7 @@ pub trait OptionsData {
     fn ascii(&self) -> bool;
 }
 
-impl OptionsData for JSONFormat {
+impl OptionsData for JsonOptions {
     fn indent(&self) -> Option<&[u8]> {
         self.indent.as_ref().map(|s| s.as_bytes())
     }
@@ -152,14 +151,14 @@ impl OptionsData for JSONFormat {
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct JSONFormatRef<'a> {
+pub struct JsonOptionsRef<'a> {
     indent: Option<&'a [u8]>,
     comma: &'a [u8],
     colon: &'a [u8],
     ascii: bool,
 }
 
-impl<'a> OptionsData for JSONFormatRef<'a> {
+impl<'a> OptionsData for JsonOptionsRef<'a> {
     fn indent(&self) -> Option<&[u8]> {
         self.indent
     }
@@ -178,15 +177,15 @@ impl<'a> OptionsData for JSONFormatRef<'a> {
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct JSONFormatterBase<O> {
+pub struct JsonFormatterBase<O> {
     indent_level: usize,
     indent_next: bool,
     options: O,
 }
 
-impl<O: OptionsData> JSONFormatterBase<O> {
+impl<O: OptionsData> JsonFormatterBase<O> {
     fn new(options: O) -> Self {
-        JSONFormatterBase {
+        JsonFormatterBase {
             indent_level: 0,
             indent_next: false,
             options,
@@ -204,7 +203,7 @@ impl<O: OptionsData> JSONFormatterBase<O> {
     }
 }
 
-impl<O: OptionsData> Formatter for JSONFormatterBase<O> {
+impl<O: OptionsData> Formatter for JsonFormatterBase<O> {
     fn begin_array<W: ?Sized + Write>(&mut self, writer: &mut W) -> io::Result<()> {
         self.indent_level += 1;
         self.indent_next = false;
@@ -287,8 +286,8 @@ impl<O: OptionsData> Formatter for JSONFormatterBase<O> {
     }
 }
 
-pub type JSONFormatterOwned = JSONFormatterBase<JSONFormat>;
-pub type JSONFormatter<'a> = JSONFormatterBase<JSONFormatRef<'a>>;
+pub type JsonFormatterOwned = JsonFormatterBase<JsonOptions>;
+pub type JsonFormatter<'a> = JsonFormatterBase<JsonOptionsRef<'a>>;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 // TODO: Rename to something like "ArgumentError"/"ParameterError"
