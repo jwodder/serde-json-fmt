@@ -76,7 +76,8 @@ impl JsonOptions {
     }
 
     pub fn indent_width(self, n: Option<usize>) -> Self {
-        self.indent(n.map(|i| " ".repeat(i))).unwrap()
+        self.indent(n.map(|i| CompactString::from(" ").repeat(i)))
+            .unwrap()
     }
 
     pub fn build(self) -> JsonFormatterOwned {
