@@ -280,7 +280,7 @@ impl JsonOptions {
     /// Unlike [`build()`][JsonOptions::build], this method makes it possible
     /// to create multiple `Formatter`s from a single `JsonOptions` instance.
     pub fn as_formatter(&self) -> JsonFormatter<'_> {
-        JsonFormatter::new(internal::JsonOptionsRef {
+        JsonFormatter::new(internal::JsonOpts {
             indent: self.indent.as_ref().map(|s| s.as_bytes()),
             comma: self.comma.as_bytes(),
             colon: self.colon.as_bytes(),
@@ -327,14 +327,14 @@ mod internal {
     }
 
     #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-    pub struct JsonOptionsRef<'a> {
+    pub struct JsonOpts<'a> {
         pub indent: Option<&'a [u8]>,
         pub comma: &'a [u8],
         pub colon: &'a [u8],
         pub ascii: bool,
     }
 
-    impl<'a> OptionsData for JsonOptionsRef<'a> {
+    impl<'a> OptionsData for JsonOpts<'a> {
         fn indent(&self) -> Option<&[u8]> {
             self.indent
         }
@@ -473,7 +473,7 @@ pub type JsonFormatterOwned = internal::JsonFormatterBase<JsonOptions>;
 ///
 /// Instances of this type are acquired by calling
 /// [`JsonOptions::as_formatter()`].
-pub type JsonFormatter<'a> = internal::JsonFormatterBase<internal::JsonOptionsRef<'a>>;
+pub type JsonFormatter<'a> = internal::JsonFormatterBase<internal::JsonOpts<'a>>;
 
 /// Error returned when an invalid string is passed to certain [`JsonOptions`]
 /// methods.
