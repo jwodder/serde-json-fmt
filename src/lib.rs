@@ -29,7 +29,7 @@ impl JsonOptions {
     pub fn pretty() -> Self {
         JsonOptions {
             indent: Some("  ".into()),
-            comma: ", ".into(),
+            comma: ",".into(),
             colon: ": ".into(),
             ascii: false,
         }
@@ -85,7 +85,7 @@ impl JsonOptions {
     }
 
     pub fn as_formatter(&self) -> JsonFormatter<'_> {
-        JsonFormatter::new(JsonOptionsRef {
+        JsonFormatter::new(internal::JsonOptionsRef {
             indent: self.indent.as_ref().map(|s| s.as_bytes()),
             comma: self.comma.as_bytes(),
             colon: self.colon.as_bytes(),
@@ -126,169 +126,173 @@ impl Default for JsonOptions {
     }
 }
 
-pub trait OptionsData {
-    fn indent(&self) -> Option<&[u8]>;
-    fn comma(&self) -> &[u8];
-    fn colon(&self) -> &[u8];
-    fn ascii(&self) -> bool;
-}
+mod internal {
+    use super::*;
 
-impl OptionsData for JsonOptions {
-    fn indent(&self) -> Option<&[u8]> {
-        self.indent.as_ref().map(|s| s.as_bytes())
+    pub trait OptionsData {
+        fn indent(&self) -> Option<&[u8]>;
+        fn comma(&self) -> &[u8];
+        fn colon(&self) -> &[u8];
+        fn ascii(&self) -> bool;
     }
 
-    fn comma(&self) -> &[u8] {
-        self.comma.as_bytes()
-    }
+    impl OptionsData for JsonOptions {
+        fn indent(&self) -> Option<&[u8]> {
+            self.indent.as_ref().map(|s| s.as_bytes())
+        }
 
-    fn colon(&self) -> &[u8] {
-        self.colon.as_bytes()
-    }
+        fn comma(&self) -> &[u8] {
+            self.comma.as_bytes()
+        }
 
-    fn ascii(&self) -> bool {
-        self.ascii
-    }
-}
+        fn colon(&self) -> &[u8] {
+            self.colon.as_bytes()
+        }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct JsonOptionsRef<'a> {
-    indent: Option<&'a [u8]>,
-    comma: &'a [u8],
-    colon: &'a [u8],
-    ascii: bool,
-}
-
-impl<'a> OptionsData for JsonOptionsRef<'a> {
-    fn indent(&self) -> Option<&[u8]> {
-        self.indent
-    }
-
-    fn comma(&self) -> &[u8] {
-        self.comma
-    }
-
-    fn colon(&self) -> &[u8] {
-        self.colon
-    }
-
-    fn ascii(&self) -> bool {
-        self.ascii
-    }
-}
-
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct JsonFormatterBase<O> {
-    indent_level: usize,
-    indent_next: bool,
-    options: O,
-}
-
-impl<O: OptionsData> JsonFormatterBase<O> {
-    fn new(options: O) -> Self {
-        JsonFormatterBase {
-            indent_level: 0,
-            indent_next: false,
-            options,
+        fn ascii(&self) -> bool {
+            self.ascii
         }
     }
 
-    fn print_indent<W: ?Sized + Write>(&self, writer: &mut W) -> io::Result<()> {
-        if let Some(indent) = self.options.indent() {
-            writer.write_all(b"\n")?;
-            for _ in 0..self.indent_level {
-                writer.write_all(indent)?;
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+    pub struct JsonOptionsRef<'a> {
+        pub indent: Option<&'a [u8]>,
+        pub comma: &'a [u8],
+        pub colon: &'a [u8],
+        pub ascii: bool,
+    }
+
+    impl<'a> OptionsData for JsonOptionsRef<'a> {
+        fn indent(&self) -> Option<&[u8]> {
+            self.indent
+        }
+
+        fn comma(&self) -> &[u8] {
+            self.comma
+        }
+
+        fn colon(&self) -> &[u8] {
+            self.colon
+        }
+
+        fn ascii(&self) -> bool {
+            self.ascii
+        }
+    }
+
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    pub struct JsonFormatterBase<O> {
+        indent_level: usize,
+        indent_next: bool,
+        options: O,
+    }
+
+    impl<O: OptionsData> JsonFormatterBase<O> {
+        pub fn new(options: O) -> Self {
+            JsonFormatterBase {
+                indent_level: 0,
+                indent_next: false,
+                options,
             }
         }
-        Ok(())
-    }
-}
 
-impl<O: OptionsData> Formatter for JsonFormatterBase<O> {
-    fn begin_array<W: ?Sized + Write>(&mut self, writer: &mut W) -> io::Result<()> {
-        self.indent_level += 1;
-        self.indent_next = false;
-        writer.write_all(b"[")
-    }
-
-    fn begin_array_value<W: ?Sized + Write>(
-        &mut self,
-        writer: &mut W,
-        first: bool,
-    ) -> io::Result<()> {
-        if !first {
-            writer.write_all(self.options.comma())?;
-        }
-        self.print_indent(writer)
-    }
-
-    fn end_array_value<W: ?Sized + Write>(&mut self, _writer: &mut W) -> io::Result<()> {
-        self.indent_next = true;
-        Ok(())
-    }
-
-    fn end_array<W: ?Sized + Write>(&mut self, writer: &mut W) -> io::Result<()> {
-        self.indent_level -= 1;
-        if self.indent_next {
-            self.print_indent(writer)?;
-        }
-        writer.write_all(b"]")
-    }
-
-    fn begin_object<W: ?Sized + Write>(&mut self, writer: &mut W) -> io::Result<()> {
-        self.indent_level += 1;
-        self.indent_next = false;
-        writer.write_all(b"{")
-    }
-
-    fn begin_object_key<W: ?Sized + Write>(
-        &mut self,
-        writer: &mut W,
-        first: bool,
-    ) -> io::Result<()> {
-        if !first {
-            writer.write_all(self.options.comma())?;
-        }
-        self.print_indent(writer)
-    }
-
-    fn begin_object_value<W: ?Sized + io::Write>(&mut self, writer: &mut W) -> io::Result<()> {
-        writer.write_all(self.options.colon())
-    }
-
-    fn end_object_value<W: ?Sized + Write>(&mut self, _writer: &mut W) -> io::Result<()> {
-        self.indent_next = true;
-        Ok(())
-    }
-
-    fn end_object<W: ?Sized + Write>(&mut self, writer: &mut W) -> io::Result<()> {
-        self.indent_level -= 1;
-        if self.indent_next {
-            self.print_indent(writer)?;
-        }
-        writer.write_all(b"}")
-    }
-
-    fn write_string_fragment<W: ?Sized + Write>(
-        &mut self,
-        writer: &mut W,
-        fragment: &str,
-    ) -> io::Result<()> {
-        for ch in fragment.chars() {
-            if !self.options.ascii() || ch.is_ascii() {
-                writer.write_all(ch.encode_utf8(&mut [0; 4]).as_bytes())?;
-            } else {
-                for surrogate in ch.encode_utf16(&mut [0; 2]) {
-                    write!(writer, "\\u{surrogate:04x}")?;
+        fn print_indent<W: ?Sized + Write>(&self, writer: &mut W) -> io::Result<()> {
+            if let Some(indent) = self.options.indent() {
+                writer.write_all(b"\n")?;
+                for _ in 0..self.indent_level {
+                    writer.write_all(indent)?;
                 }
             }
+            Ok(())
         }
-        Ok(())
+    }
+
+    impl<O: OptionsData> Formatter for JsonFormatterBase<O> {
+        fn begin_array<W: ?Sized + Write>(&mut self, writer: &mut W) -> io::Result<()> {
+            self.indent_level += 1;
+            self.indent_next = false;
+            writer.write_all(b"[")
+        }
+
+        fn begin_array_value<W: ?Sized + Write>(
+            &mut self,
+            writer: &mut W,
+            first: bool,
+        ) -> io::Result<()> {
+            if !first {
+                writer.write_all(self.options.comma())?;
+            }
+            self.print_indent(writer)
+        }
+
+        fn end_array_value<W: ?Sized + Write>(&mut self, _writer: &mut W) -> io::Result<()> {
+            self.indent_next = true;
+            Ok(())
+        }
+
+        fn end_array<W: ?Sized + Write>(&mut self, writer: &mut W) -> io::Result<()> {
+            self.indent_level -= 1;
+            if self.indent_next {
+                self.print_indent(writer)?;
+            }
+            writer.write_all(b"]")
+        }
+
+        fn begin_object<W: ?Sized + Write>(&mut self, writer: &mut W) -> io::Result<()> {
+            self.indent_level += 1;
+            self.indent_next = false;
+            writer.write_all(b"{")
+        }
+
+        fn begin_object_key<W: ?Sized + Write>(
+            &mut self,
+            writer: &mut W,
+            first: bool,
+        ) -> io::Result<()> {
+            if !first {
+                writer.write_all(self.options.comma())?;
+            }
+            self.print_indent(writer)
+        }
+
+        fn begin_object_value<W: ?Sized + io::Write>(&mut self, writer: &mut W) -> io::Result<()> {
+            writer.write_all(self.options.colon())
+        }
+
+        fn end_object_value<W: ?Sized + Write>(&mut self, _writer: &mut W) -> io::Result<()> {
+            self.indent_next = true;
+            Ok(())
+        }
+
+        fn end_object<W: ?Sized + Write>(&mut self, writer: &mut W) -> io::Result<()> {
+            self.indent_level -= 1;
+            if self.indent_next {
+                self.print_indent(writer)?;
+            }
+            writer.write_all(b"}")
+        }
+
+        fn write_string_fragment<W: ?Sized + Write>(
+            &mut self,
+            writer: &mut W,
+            fragment: &str,
+        ) -> io::Result<()> {
+            for ch in fragment.chars() {
+                if !self.options.ascii() || ch.is_ascii() {
+                    writer.write_all(ch.encode_utf8(&mut [0; 4]).as_bytes())?;
+                } else {
+                    for surrogate in ch.encode_utf16(&mut [0; 2]) {
+                        write!(writer, "\\u{surrogate:04x}")?;
+                    }
+                }
+            }
+            Ok(())
+        }
     }
 }
 
-pub type JsonFormatterOwned = JsonFormatterBase<JsonOptions>;
-pub type JsonFormatter<'a> = JsonFormatterBase<JsonOptionsRef<'a>>;
+pub type JsonFormatterOwned = internal::JsonFormatterBase<JsonOptions>;
+pub type JsonFormatter<'a> = internal::JsonFormatterBase<internal::JsonOptionsRef<'a>>;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 // TODO: Rename to something like "ArgumentError"/"ParameterError"
