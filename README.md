@@ -1,9 +1,9 @@
-[![Project Status: WIP – Initial development is in progress, but there has not yet been a stable, usable release suitable for the public.](https://www.repostatus.org/badges/latest/wip.svg)](https://www.repostatus.org/#wip) <!-- [![Project Status: Active – The project has reached a stable, usable state and is being actively developed.](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active) -->
+[![Project Status: Active – The project has reached a stable, usable state and is being actively developed.](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active)
 [![CI Status](https://github.com/jwodder/serde-json-fmt/actions/workflows/test.yml/badge.svg)](https://github.com/jwodder/serde-json-fmt/actions/workflows/test.yml)
 [![codecov.io](https://codecov.io/gh/jwodder/serde-json-fmt/branch/master/graph/badge.svg)](https://codecov.io/gh/jwodder/serde-json-fmt)
 [![MIT License](https://img.shields.io/github/license/jwodder/serde-json-fmt.svg)](https://opensource.org/licenses/MIT)
 
-[GitHub](https://github.com/jwodder/serde-json-fmt) <!-- | [crates.io](https://crates.io/crates/serde-json-fmt) | [Documentation](https://docs.rs/serde-json-fmt) --> | [Issues](https://github.com/jwodder/serde-json-fmt/issues)
+[GitHub](https://github.com/jwodder/serde-json-fmt) | [crates.io](https://crates.io/crates/serde-json-fmt) | [Documentation](https://docs.rs/serde-json-fmt) | [Issues](https://github.com/jwodder/serde-json-fmt/issues)
 
 The `serde-json-fmt` crate lets you create custom
 [`serde_json`](https://crates.io/crates/serde_json) formatters with the
@@ -14,6 +14,18 @@ either "compact" form or "pretty" form, with the only customizable aspect being
 the string used for pretty indentation.  `serde-json-fmt` complements
 `serde_json` to let you also customize the whitespace around commas & colons
 and whether to escape non-ASCII characters.
+
+Installation
+============
+
+`serde-json-fmt` requires version 1.60 of Rust or higher.  To use the
+`serde-json-fmt` library in your Cargo project, add the following to your
+`Cargo.toml`:
+
+```toml
+[dependencies]
+serde-json-fmt = "0.1.0"
+```
 
 Examples
 ========
