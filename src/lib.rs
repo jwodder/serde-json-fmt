@@ -1,5 +1,3 @@
-//! Configurable formatting for serde_json serialization
-//!
 //! The `serde-json-fmt` crate lets you create custom [`serde_json`] formatters
 //! with the indentation, separators, and ASCII requirements of your choice.
 //!
