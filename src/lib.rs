@@ -88,8 +88,7 @@ use smartstring::alias::CompactString;
 use std::fmt;
 use std::io::{self, Write};
 
-/// A [`Formatter`][serde_json::ser::Formatter] builder for configuring JSON
-/// serialization options.
+/// A [`Formatter`] builder for configuring JSON serialization options.
 ///
 /// This type is the "entry point" to `serde-json-fmt`'s functionality.  To
 /// perform custom-formatted JSON serialization, start by creating a
