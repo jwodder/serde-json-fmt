@@ -206,7 +206,7 @@ impl JsonFormat {
     /// `None`.
     pub fn indent_width(self, n: Option<usize>) -> Self {
         self.indent(n.map(|i| CompactString::from(" ").repeat(i)))
-            .unwrap()
+            .expect("repeated spaces should be valid indentation")
     }
 
     /// Format a [`serde::Serialize`] value to a [`String`] as JSON using the
@@ -220,7 +220,7 @@ impl JsonFormat {
         value: &T,
     ) -> Result<String, serde_json::Error> {
         self.format_to_vec(value)
-            .map(|v| String::from_utf8(v).unwrap())
+            .map(|v| String::from_utf8(v).expect("serialized JSON should be valid UTF-8"))
     }
 
     /// Format a [`serde::Serialize`] value to a [`Vec<u8>`] as JSON using the
