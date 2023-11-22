@@ -205,8 +205,10 @@ impl JsonFormat {
     /// of the given number of space characters, or with `None` if `n` is
     /// `None`.
     pub fn indent_width(self, n: Option<usize>) -> Self {
-        self.indent(n.map(|i| CompactString::from(" ").repeat(i)))
-            .expect("repeated spaces should be valid indentation")
+        let Ok(me) = self.indent(n.map(|i| CompactString::from(" ").repeat(i))) else {
+            unreachable!("repeated spaces should be valid indentation");
+        };
+        me
     }
 
     /// Format a [`serde::Serialize`] value to a [`String`] as JSON using the
@@ -219,8 +221,11 @@ impl JsonFormat {
         &self,
         value: &T,
     ) -> Result<String, serde_json::Error> {
-        self.format_to_vec(value)
-            .map(|v| String::from_utf8(v).expect("serialized JSON should be valid UTF-8"))
+        let bytes = self.format_to_vec(value)?;
+        let Ok(s) = String::from_utf8(bytes) else {
+            unreachable!("serialized JSON should be valid UTF-8");
+        };
+        Ok(s)
     }
 
     /// Format a [`serde::Serialize`] value to a [`Vec<u8>`] as JSON using the
@@ -331,7 +336,7 @@ mod internal {
         pub ascii: bool,
     }
 
-    impl<'a> OptionsData for JsonFmt<'a> {
+    impl OptionsData for JsonFmt<'_> {
         fn indent(&self) -> Option<&[u8]> {
             self.indent
         }
@@ -424,7 +429,7 @@ mod internal {
             self.print_indent(writer)
         }
 
-        fn begin_object_value<W: ?Sized + io::Write>(&mut self, writer: &mut W) -> io::Result<()> {
+        fn begin_object_value<W: ?Sized + Write>(&mut self, writer: &mut W) -> io::Result<()> {
             writer.write_all(self.options.colon())
         }
 
@@ -492,7 +497,7 @@ pub enum JsonSyntaxError {
 }
 
 impl fmt::Display for JsonSyntaxError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use JsonSyntaxError::*;
         match self {
             InvalidCharacter(c) => write!(f, "string contains unexpected character {c:?}"),
