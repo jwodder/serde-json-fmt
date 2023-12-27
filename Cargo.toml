@@ -2,7 +2,7 @@
 name = "serde-json-fmt"
 version = "0.2.0-dev"
 edition = "2021"
-rust-version = "1.65"
+rust-version = "1.66"
 description = "Configurable formatting for serde_json serialization"
 authors = ["John Thorvald Wodder II <serde-json-fmt@varonathe.org>"]
 repository = "https://github.com/jwodder/serde-json-fmt"
