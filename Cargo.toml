@@ -2,7 +2,7 @@
 name = "serde-json-fmt"
 version = "0.2.0-dev"
 edition = "2021"
-rust-version = "1.67"
+rust-version = "1.70"
 description = "Configurable formatting for serde_json serialization"
 authors = ["John Thorvald Wodder II <serde-json-fmt@varonathe.org>"]
 repository = "https://github.com/jwodder/serde-json-fmt"
@@ -18,7 +18,7 @@ smartstring = "1.0.1"
 
 [dev-dependencies]
 indoc = "2.0.1"
-rstest = { version = "0.23.0", default-features = false }
+rstest = { version = "0.24.0", default-features = false }
 
 [lints.rust]
 # Lint groups:
