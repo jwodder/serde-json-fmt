@@ -12,9 +12,9 @@ categories = ["encoding", "value-formatting"]
 exclude = ["/.*"]
 
 [dependencies]
+compact_str = "0.10.0"
 serde = { version = "1.0.160", default-features = false }
 serde_json = "1.0.96"
-smartstring = "1.0.1"
 
 [dev-dependencies]
 indoc = "2.0.1"
