@@ -1,5 +1,5 @@
-v0.2.0 (in development)
------------------------
+v0.2.0 (2026-08-12)
+-------------------
 - Remove library installation instructions from README
 - Increased MSRV to 1.71
 - Replace unmaintained `smartstring` dependency with `compact_str`
