@@ -81,10 +81,10 @@
 //! }"#);
 //! ```
 
+use compact_str::CompactString;
 use serde::Serialize;
 use serde_json::ser::Formatter;
 use serde_json::Serializer;
-use smartstring::alias::CompactString;
 use std::fmt;
 use std::io::{self, Write};
 
@@ -283,7 +283,7 @@ impl JsonFormat {
     /// create multiple `Formatter`s from a single `JsonFormat` instance.
     pub fn as_formatter(&self) -> JsonFrmtr<'_> {
         JsonFrmtr::new(internal::JsonFmt {
-            indent: self.indent.as_ref().map(|s| s.as_bytes()),
+            indent: self.indent.as_ref().map(CompactString::as_bytes),
             comma: self.comma.as_bytes(),
             colon: self.colon.as_bytes(),
             ascii: self.ascii,
@@ -312,7 +312,7 @@ mod internal {
 
     impl OptionsData for JsonFormat {
         fn indent(&self) -> Option<&[u8]> {
-            self.indent.as_ref().map(|s| s.as_bytes())
+            self.indent.as_ref().map(CompactString::as_bytes)
         }
 
         fn comma(&self) -> &[u8] {
